@@ -4,11 +4,31 @@ import enum
 import logging
 import uuid
 from itertools import count
-from typing import Iterable, Iterator, Literal
+from typing import Iterable, Iterator, Literal, NewType, NoReturn, Optional
 
 from . import exceptions
 
 logger = logging.getLogger(__name__)
+
+
+class Location(enum.Enum):
+    """Where robots can go"""
+
+    CAFETERIA = "cafeteria"
+    ON_MY_WAY = "on my way..."
+    FOO_MINE = "foo mine"
+    BAR_MINE = "bar mine"
+    ASSEMBLY_LINE = "assembly line"
+    MATERIAL_STORE = "material store"
+    ROBOTS_STORE = "robots store"
+
+    @classmethod
+    def by_name(cls, name: str) -> "Location":
+        """Get location by name or raise UnknownLocation"""
+        try:
+            return cls(name)
+        except ValueError as bad_location:
+            raise exceptions.UnknownLocation(name) from bad_location
 
 
 class Material(enum.Enum):
@@ -17,9 +37,20 @@ class Material(enum.Enum):
     FOO = "foo"
     BAR = "bar"
 
+    @property
+    def where_to_find_it(self) -> Location:
+        """Return the mine for the materia"""
+        locations = {
+            Material.FOO: Location.FOO_MINE,
+            Material.BAR: Location.BAR_MINE,
+        }
+        return locations[self]
+
 
 class RobotState(abc.ABC):
     """Abstract robot state"""
+
+    location: Location
 
     def __init__(self, robot: "Robot") -> None:
         self.robot = robot
@@ -27,7 +58,7 @@ class RobotState(abc.ABC):
     def __str__(self) -> str:
         return self.__class__.__name__
 
-    def move(self):
+    def move(self, destination: Location):
         """Try to move the robot"""
         raise exceptions.InvalidTransition(f"Cannot move robot {self.robot}")
 
@@ -55,8 +86,11 @@ class Haunting(RobotState):
 class Moving(RobotState):
     """Robot is 🚶"""
 
-    def move(self):
-        pass
+    location = Location.ON_MY_WAY
+
+    def __init__(self, robot: "Robot", destination: Location):
+        super().__init__(robot)
+        self.destination = destination
 
 
 class Mining(RobotState):
@@ -65,36 +99,50 @@ class Mining(RobotState):
     def __init__(self, robot: "Robot", material: Material) -> None:
         super().__init__(robot)
         self.material = material
+        self.location = material.where_to_find_it
 
     def __str__(self) -> str:
-        return f"Mining {self.material.value}"
+        return f"Mining {self.material.value} at {self.location.value.title()}"
 
 
 class Assembling(RobotState):
     """Robot is assembling"""
+
+    location = Location.ASSEMBLY_LINE
 
     def __init__(self, robot: "Robot", stock: "Stock") -> None:
         super().__init__(robot)
         self.stock = stock
 
     def __str__(self) -> str:
-        return f"Assembling foo bar"
+        return "Assembling a foobar..."
 
 
 class Idle(RobotState):
     """Robot is sleeping 😴"""
 
-    def move(self):
-        self.robot.state = Moving(self.robot)
+    def __init__(self, robot: "Robot", location: Location) -> None:
+        super().__init__(robot)
+        self.location = location
+
+    def move(self, destination: Location):
+        self.robot.state = Moving(self.robot, destination)
 
     def mine(self, material: Material):
-        self.robot.state = Mining(self.robot, material)
+        if self.location is material.where_to_find_it:
+            self.robot.state = Mining(self.robot, material)
+        raise exceptions.InvalidTransition(
+            f"Move to {material.where_to_find_it} before mining {material}"
+        )
 
     def assemble(self, stock: "Stock"):
+        if not self.location is Assembling.location:
+            raise exceptions.InvalidTransition(f"Move to {Assembling.location} first")
         try:
             stock.start_assembling()
         except exceptions.NotEnoughMaterial as missing_materials:
             raise exceptions.InvalidTransition from missing_materials
+
         self.robot.state = Assembling(self.robot, stock=stock)
 
 
@@ -107,9 +155,9 @@ class Robot:
     Beware a ghost may be haunting the factory
     """
 
-    def __init__(self, id_: RobotId):
+    def __init__(self, id_: RobotId, location: Location = Location.CAFETERIA):
         self.id_ = id_
-        self.state: RobotState = Idle(self)
+        self.state: RobotState = Idle(self, location)
 
     @property
     def status(self) -> str:
@@ -145,10 +193,14 @@ Foobar = uuid.UUID
 class Stock:
     """Material stock"""
 
-    def __init__(self):
-        self.foos: int = 0
-        self.bars: int = 0
-        self.foobars: list[Foobar] = []
+    def __init__(
+        self, foos_nb=0, bars_nb=0, foobars: Optional[list[Foobar]] = None
+    ) -> None:
+        self.foos: int = foos_nb
+        self.bars: int = bars_nb
+        if foobars is None:
+            foobars = []
+        self.foobars: list[Foobar] = foobars
 
     def has_enough_material(self) -> bool:
         """Check if wa have enough material to build a foobar"""
@@ -177,9 +229,9 @@ class Stock:
 class RoboticFactory:
     """Outstanding Robotic factory 🏭"""
 
-    def __init__(self, robots: list[Robot]) -> None:
+    def __init__(self, robots: list[Robot], stock: Stock) -> None:
         self.robots = robots
-        self.stock = Stock()
+        self.stock = stock
 
     def get_robot(self, robot_id: int) -> Robot:
         """Get the robot with the given id"""
@@ -189,10 +241,11 @@ class RoboticFactory:
         logger.error("Robot %s not found", robot_id)
         return Robot.ghost()
 
-    def move(self, robot_id: int) -> None:
+    def move(self, robot_id: int, destination: str) -> None:
         """Say robot to move"""
+        true_destination = Location.by_name(destination.lower())
         robot = self.get_robot(robot_id)
-        robot.state.move()
+        robot.state.move(true_destination)
 
     def mine(self, robot_id: int, material: Material) -> None:
         """Say robot to move"""

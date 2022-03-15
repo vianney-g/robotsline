@@ -11,20 +11,20 @@ Handler = Callable[[commands.Command], None]
 
 
 @functools.singledispatch
-def handler(command: Any, on_factory: models.RoboticFactory) -> None:
+def _handler(command: Any, on_factory: models.RoboticFactory) -> None:
     """Default handler when command is not regstered
 
     :raises: DomainError
     """
 
 
-@handler.register
+@_handler.register
 def move(command: commands.MoveRobot, on_factory: models.RoboticFactory) -> None:
     """Move a robot"""
-    on_factory.move(robot_id=command.robot_id)
+    on_factory.move(robot_id=command.robot_id, destination=command.destination)
 
 
-@handler.register
+@_handler.register
 def mine(command: commands.Mine, on_factory: models.RoboticFactory) -> None:
     """Ask a robot to mine"""
     try:
@@ -36,7 +36,7 @@ def mine(command: commands.Mine, on_factory: models.RoboticFactory) -> None:
     on_factory.mine(robot_id=command.robot_id, material=material)
 
 
-@handler.register
+@_handler.register
 def assemble(command: commands.Assemble, on_factory: models.RoboticFactory) -> None:
     """Ask a robot to mine"""
     on_factory.assemble(robot_id=command.robot_id)
@@ -54,4 +54,4 @@ def ignore_domain_errors(function: Handler):
     return wrapper
 
 
-execute = ignore_domain_errors(handler)
+execute = ignore_domain_errors(_handler)

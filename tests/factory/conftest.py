@@ -19,8 +19,8 @@ def robot() -> Callable[[], models.Robot]:
 
 @pytest.fixture
 def robotic_factory(robot) -> Callable[[int], models.RoboticFactory]:
-    def _factory(robots_nb: int) -> models.RoboticFactory:
+    def _factory(robots_nb: int = 0) -> models.RoboticFactory:
         robots = [robot() for _ in range(robots_nb)]
-        return models.RoboticFactory(robots)
+        return models.RoboticFactory(robots, stock=models.Stock())
 
     return _factory

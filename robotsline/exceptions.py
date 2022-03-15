@@ -11,3 +11,7 @@ class InvalidTransition(DomainError):
 
 class NotEnoughMaterial(DomainError):
     """Not enough material to build foobar"""
+
+
+class UnknownLocation(DomainError):
+    """We don't know where you are 🤷"""
