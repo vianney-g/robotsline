@@ -46,3 +46,9 @@ def mine(command: commands.Mine, on_factory: models.RoboticFactory) -> None:
         robot.mine(material)
     except exceptions.InvalidTransition as cannot_mine:
         logger.error(cannot_mine)
+
+
+@execute.register
+def assemble(command: commands.Assemble, on_factory: models.RoboticFactory) -> None:
+    """Ask a robot to mine"""
+    on_factory.assemble(robot_id=command.robot_id)

@@ -18,3 +18,10 @@ class Mine:
 
     robot_id: int
     material: str
+
+
+@dataclasses.dataclass(frozen=True)
+class Assemble:
+    """Ask a robot to assemble"""
+
+    robot_id: int

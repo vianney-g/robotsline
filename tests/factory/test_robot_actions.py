@@ -3,7 +3,7 @@
 
 import pytest
 
-from robotsline import commands, handlers
+from robotsline import commands, handlers, models
 
 
 def test_new_robots_are_idling(robotic_factory):
@@ -56,6 +56,7 @@ def test_asking_a_robot_to_mine_something(robotic_factory, material):
     # the robot is now mining the requested material
     assert robot.status == f"Mining {material}"
 
+
 def test_asking_a_robot_to_mine_a_bad_material(robotic_factory):
     # Given a robot in a factory
     factory = robotic_factory(1)
@@ -67,3 +68,45 @@ def test_asking_a_robot_to_mine_a_bad_material(robotic_factory):
 
     # the robot is still idling
     assert robot.status == f"Idle"
+
+
+def test_asking_a_robot_to_assemble_foo_and_bar(robotic_factory):
+    # Given a robot in a factory with enough stock
+    factory = robotic_factory(1)
+    factory.stock.foos = 1
+    factory.stock.bars = 1
+
+    robot = factory.robots[0]
+
+    # When I ask it to assemble
+    assemble = commands.Assemble(robot_id=robot.id_)
+    handlers.execute(assemble, on_factory=factory)
+
+    # the robot is assembling
+    assert robot.status == f"Assembling foo bar"
+    # and stock is lower
+    assert factory.stock.foos == 0
+    assert factory.stock.bars == 0
+
+
+def test_asking_a_robot_to_assemble_but_she_is_busy(robotic_factory):
+    # Given a robot in a factory with enough stock, but robot is mining
+    factory = robotic_factory(1)
+    factory.stock.foos = 1
+    factory.stock.bars = 1
+    factory.stock.foebars = []
+
+    robot = factory.robots[0]
+    robot.mine(models.Material("foo"))
+
+    # When I ask it to assemble
+    assemble = commands.Assemble(robot_id=robot.id_)
+    handlers.execute(assemble, on_factory=factory)
+
+    # Then the robot is still mining
+    assert robot.status == f"Mining foo"
+    # And stock didn't changed
+    assert factory.stock.foos == 1
+    assert factory.stock.bars == 1
+    # And foobar is not yet produced
+    assert factory.stock.foobars == []
