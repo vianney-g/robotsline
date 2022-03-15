@@ -1,8 +1,11 @@
 """Execution of commands on a robotic factory"""
 import functools
+import logging
 from typing import Any
 
-from . import commands, models, exceptions
+from . import commands, exceptions, models
+
+logger = logging.getLogger(__name__)
 
 
 @functools.singledispatch
@@ -20,7 +23,10 @@ def move(command: commands.MoveRobot, on_factory: models.RoboticFactory) -> None
     if robot is None:
         return
 
-    robot.move()
+    try:
+        robot.move()
+    except exceptions.InvalidTransition as cannot_move:
+        logger.error(cannot_move)
 
 
 @execute.register
@@ -33,7 +39,10 @@ def mine(command: commands.Mine, on_factory: models.RoboticFactory) -> None:
     try:
         material = models.Material(command.material)
     except ValueError as unknown_material:
-        raise exceptions.UnknownMaterial from unknown_material
+        logger.error(unknown_material)
+        return
 
-
-    robot.mine(material)
+    try:
+        robot.mine(material)
+    except exceptions.InvalidTransition as cannot_mine:
+        logger.error(cannot_mine)
