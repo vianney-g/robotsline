@@ -131,18 +131,6 @@ class Robot:
     def __bool__(self) -> bool:
         return self.id_ == "Ghost"
 
-    def move(self) -> None:
-        """Move the robot"""
-        self.state.move()
-
-    def mine(self, material: Material) -> None:
-        """Send robot to mine"""
-        self.state.mine(material)
-
-    def assemble(self, stock: "Stock") -> None:
-        """Send robot to mine"""
-        self.state.assemble(stock)
-
 
 def robots_generator() -> Iterable[Robot]:
     """Generate some robots whose ids starting with 1"""
@@ -201,10 +189,17 @@ class RoboticFactory:
         logger.error("Robot %s not found", robot_id)
         return Robot.ghost()
 
+    def move(self, robot_id: int) -> None:
+        """Say robot to move"""
+        robot = self.get_robot(robot_id)
+        robot.state.move()
+
+    def mine(self, robot_id: int, material: Material) -> None:
+        """Say robot to move"""
+        robot = self.get_robot(robot_id)
+        robot.state.mine(material)
+
     def assemble(self, robot_id: int) -> None:
         """Say robot to assemble foobar"""
         robot = self.get_robot(robot_id)
-        try:
-            robot.assemble(self.stock)
-        except exceptions.InvalidTransition:
-            pass
+        robot.state.assemble(self.stock)

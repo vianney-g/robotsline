@@ -1,8 +1,13 @@
 """Domain specific exceptions"""
 
 
-class InvalidTransition(Exception):
+class DomainError(Exception):
+    """Base class for domain specific errors"""
+
+
+class InvalidTransition(DomainError):
     """Cannot change robot state"""
 
-class NotEnoughMaterial(Exception):
+
+class NotEnoughMaterial(DomainError):
     """Not enough material to build foobar"""
