@@ -61,3 +61,16 @@ def test_moving_a_moving_robot_is_idempotent(robotic_factory):
 
     # Then robot is still moving
     assert robot.status == "Moving"
+
+@pytest.mark.parametrize("material", ["foo", "bar"])
+def test_asking_a_robot_to_mine_something(robotic_factory, material):
+    # Given a robot in a factory
+    factory = robotic_factory(1)
+    robot = factory.robots[0]
+
+    # When I ask it to mine
+    mine = commands.Mine(robot_id=robot.id_, material=material)
+    handlers.execute(mine, on_factory=factory)
+
+    # the robot is now mining the requested material
+    assert robot.status == f"Mining {material}"

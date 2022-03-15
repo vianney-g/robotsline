@@ -10,3 +10,11 @@ class MoveRobot:
     """Ask a robot to move"""
 
     robot_id: int
+
+
+@dataclasses.dataclass(frozen=True)
+class Mine:
+    """Ask a robot to mine"""
+
+    robot_id: int
+    material: str

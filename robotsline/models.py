@@ -1,9 +1,17 @@
 """Domain models for a robotic factory"""
 import abc
+import enum
 from itertools import count
-from typing import Callable, Iterable, Iterator, Optional
+from typing import Iterable, Iterator, Optional
 
 from . import exceptions
+
+
+class Material(enum.Enum):
+    """Valid materials"""
+
+    FOO = "foo"
+    BAR = "bar"
 
 
 class RobotState(abc.ABC):
@@ -15,10 +23,13 @@ class RobotState(abc.ABC):
     def __str__(self) -> str:
         return self.__class__.__name__
 
-    @abc.abstractmethod
     def move(self):
         """Try to move the robot"""
-        raise exceptions.InvalidTransition(f"Cannot move from state {self}")
+        raise exceptions.InvalidTransition(f"Cannot move robot {self.robot}")
+
+    def mine(self, material: Material):
+        """Try to send the robot to mine"""
+        raise exceptions.InvalidTransition(f"Cannot send robot {self.robot}.")
 
 
 class Moving(RobotState):
@@ -28,11 +39,28 @@ class Moving(RobotState):
         pass
 
 
+class Mining(RobotState):
+    """Robot is ⛏"""
+
+    def __init__(self, robot: "Robot", material: Material) -> None:
+        super().__init__(robot)
+        self.material = material
+
+    def __str__(self) -> str:
+        return f"Mining {self.material.value}"
+
+    def mine(self, material: Material):
+        pass
+
+
 class Idle(RobotState):
-    """Robot doing nothing 😴"""
+    """Robot is sleeping 😴"""
 
     def move(self):
         self.robot.state = Moving(self.robot)
+
+    def mine(self, material: Material):
+        self.robot.state = Mining(self.robot, material)
 
 
 RobotId = int
@@ -58,6 +86,10 @@ class Robot:
     def move(self) -> None:
         """Move the robot"""
         self.state.move()
+
+    def mine(self, material: Material) -> None:
+        """Send robot to mine"""
+        self.state.mine(material)
 
 
 def robots_generator() -> Iterable[Robot]:
