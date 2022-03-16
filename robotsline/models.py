@@ -43,7 +43,9 @@ class Material:
     mining_time: Seconds
 
     @classmethod
-    def from_name(cls, material_name) -> "Material":
+    def from_name(
+        cls, material_name, mining_bar_range_time: tuple[int, int]
+    ) -> "Material":
         """New material from name"""
         if material_name.lower() == "foo":
             return Material(
@@ -55,7 +57,7 @@ class Material:
             return Material(
                 name="bar",
                 where_to_find_it=Location.BAR_MINE,
-                mining_time=Seconds(1),
+                mining_time=Seconds(random.randint(*mining_bar_range_time)),
             )
         raise exceptions.UnknownMaterial(material_name)
 
@@ -335,7 +337,10 @@ class RoboticFactory:
     def mine(self, robot_id: int, material: str) -> None:
         """Say robot to move"""
         robot = self.get_robot(robot_id)
-        robot.state.mine(Material.from_name(material), self.stock)
+        true_material = Material.from_name(
+            material, self.settings.mining_bar_range_time
+        )
+        robot.state.mine(true_material, self.stock)
 
     def assemble(self, robot_id: int) -> None:
         """Say robot to assemble foobar"""

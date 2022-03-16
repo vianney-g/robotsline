@@ -3,6 +3,7 @@
 import pytest
 
 from robotsline import commands, handlers, models
+from robotsline.settings import Settings
 
 
 @pytest.mark.parametrize(
@@ -78,7 +79,8 @@ def test_mining_bar():
     robot = models.Robot(1, location=models.Location.BAR_MINE)
     stock = models.Stock(bars_nb=0)
 
-    factory = models.RoboticFactory([robot], stock=stock)
+    settings = Settings(mining_bar_range_time=(1, 1))
+    factory = models.RoboticFactory([robot], stock=stock, settings=settings)
 
     # When I ask her to mine bar for 1 second
     mine = commands.Mine(robot_id=1, material="bar")
@@ -88,5 +90,26 @@ def test_mining_bar():
     # the robot is idling at the mine
     assert robot.status == "Idle"
     assert robot.state.location == models.Location.BAR_MINE
-    # And the stock of Foo increased
+    # And the stock of bars increased
     assert stock.bars == 1
+
+
+def test_mining_bar_waiting_longer():
+    # Given a robot at bar mine, and a factory with no bar stock
+    robot = models.Robot(1, location=models.Location.BAR_MINE)
+    stock = models.Stock(bars_nb=0)
+
+    # And mining bar may take a long time
+    settings = Settings(mining_bar_range_time=(10, 10))
+    factory = models.RoboticFactory([robot], stock=stock, settings=settings)
+
+    # When I ask her to mine bar for 1 second
+    mine = commands.Mine(robot_id=1, material="bar")
+    handlers.execute(mine, on_factory=factory)
+    handlers.execute(commands.Wait(seconds=1), on_factory=factory)
+
+    # The robot is still mining bar
+    assert robot.status == "Mining bar at Bar Mine"
+    # And I need 9 seconds more to mine bar
+    handlers.execute(commands.Wait(seconds=9), on_factory=factory)
+    assert robot.status == "Idle"
