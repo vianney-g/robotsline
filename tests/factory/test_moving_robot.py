@@ -3,11 +3,10 @@
 from robotsline import commands, handlers, models
 
 
-def test_a_robot_can_be_moved(robotic_factory):
+def test_a_robot_can_be_moved():
     # Given an idle robot at the cafeteria
-    factory = robotic_factory()
     robot = models.Robot(1, location=models.Location.CAFETERIA)
-    factory.robots.append(robot)
+    factory = models.RoboticFactory([robot])
 
     # When I ask her to move to foo_mine
     move_robot = commands.MoveRobot(robot_id=robot.id_, destination="Foo Mine")
@@ -18,13 +17,13 @@ def test_a_robot_can_be_moved(robotic_factory):
     assert robot.state.countdown == 5
 
 
-def test_a_moving_robot_cannot_be_rerouted(robotic_factory):
-    # Given a robot moving at the cafeteria
-    factory = robotic_factory(1)
-    robot = factory.robots[0]
+def test_a_moving_robot_cannot_be_rerouted():
+    # Given a robot moving from store to cafeteria
+    robot = models.Robot(1, location=models.Location.ROBOTS_STORE)
     robot.state.move(destination=models.Location.CAFETERIA)
+    factory = models.RoboticFactory([robot])
 
-    # When I ask it to be moved at the foo mine
+    # When I ask her to move at the foo mine
     move_robot = commands.MoveRobot(robot_id=robot.id_, destination="Foo Mine")
     handlers.execute(move_robot, on_factory=factory)
 
@@ -33,11 +32,10 @@ def test_a_moving_robot_cannot_be_rerouted(robotic_factory):
     assert robot.state.destination is models.Location.CAFETERIA
 
 
-def test_after_a_move_robot_is_idling_at_destination(robotic_factory):
+def test_after_a_move_robot_is_idling_at_destination():
     # Given an idle robot at the cafeteria
-    factory = robotic_factory()
     robot = models.Robot(1, location=models.Location.CAFETERIA)
-    factory.robots.append(robot)
+    factory = models.RoboticFactory([robot])
 
     # When I ask her to move to foo mine and I wait 5 rounds
     move_robot = commands.MoveRobot(robot_id=robot.id_, destination="Foo Mine")

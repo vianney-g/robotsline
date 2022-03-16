@@ -260,9 +260,12 @@ class Stock:
 class RoboticFactory:
     """Outstanding Robotic factory 🏭"""
 
-    def __init__(self, robots: list[Robot], stock: Stock) -> None:
+    def __init__(self, robots: list[Robot], stock: Optional[Stock] = None) -> None:
+        if stock is None:
+            stock = Stock()
+
         self.robots = robots
-        self.stock = stock
+        self.stock: Stock = stock
         self.seconds_left = Seconds(0)
 
     def get_robot(self, robot_id: int) -> Robot:
