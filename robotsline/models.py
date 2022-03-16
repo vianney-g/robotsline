@@ -2,11 +2,12 @@
 import abc
 import enum
 import logging
+import random
 import uuid
 from itertools import count
-from typing import Iterable, Iterator, Literal, NewType, NoReturn, Optional
+from typing import Iterable, Iterator, Literal, NewType, Optional
 
-from . import exceptions
+from . import exceptions, settings
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class RobotState(abc.ABC):
         """Try to send the robot to mine"""
         raise exceptions.InvalidTransition(f"Cannot send robot {self.robot} to mine.")
 
-    def assemble(self, stock: "Stock"):
+    def assemble(self, stock: "Stock", assembly_success_rate: float):
         """Try to send the robot to assembly line"""
         raise exceptions.InvalidTransition(
             f"Cannot send robot {self.robot} to assembly line."
@@ -139,12 +140,22 @@ class Assembling(RobotState):
 
     LOCATION = Location.ASSEMBLY_LINE
 
-    def __init__(self, robot: "Robot", stock: "Stock") -> None:
+    def __init__(
+        self, robot: "Robot", stock: "Stock", assembly_success_rate: float
+    ) -> None:
         super().__init__(robot, countdown=Seconds(2), location=self.LOCATION)
         self.stock = stock
+        self.assembly_success_rate = assembly_success_rate
 
     def __str__(self) -> str:
         return "Assembling a foobar..."
+
+    def terminate(self) -> None:
+        if random.random() <= self.assembly_success_rate:
+            self.stock.end_assembling_success()
+        else:
+            self.stock.end_assembling_failure()
+        self.robot.state = Idle(self.robot, location=self.location)
 
 
 class Idle(RobotState):
@@ -163,7 +174,7 @@ class Idle(RobotState):
             f"Move to {material.where_to_find_it} before mining {material}"
         )
 
-    def assemble(self, stock: "Stock"):
+    def assemble(self, stock: "Stock", assembly_success_rate: float):
         if not self.location is Assembling.LOCATION:
             raise exceptions.InvalidTransition(f"Move to {Assembling.location} first")
         try:
@@ -171,7 +182,11 @@ class Idle(RobotState):
         except exceptions.NotEnoughMaterial as missing_materials:
             raise exceptions.InvalidTransition from missing_materials
 
-        self.robot.state = Assembling(self.robot, stock=stock)
+        self.robot.state = Assembling(
+            self.robot,
+            stock=stock,
+            assembly_success_rate=assembly_success_rate,
+        )
 
 
 RobotId = int | Literal["Ghost"]
@@ -250,23 +265,33 @@ class Stock:
         self.foos -= 1
         self.bars -= 1
 
-    def end_assembling(self) -> Foobar:
+    def end_assembling_success(self):
         """A new Foobar is built 😂"""
         foobar = uuid.uuid4()
         self.foobars.append(foobar)
-        return foobar
+
+    def end_assembling_failure(self):
+        """Oh no!! 😥"""
+        # we still saved a bar...
+        self.bars += 1
 
 
 class RoboticFactory:
     """Outstanding Robotic factory 🏭"""
 
-    def __init__(self, robots: list[Robot], stock: Optional[Stock] = None) -> None:
+    def __init__(
+        self,
+        robots: list[Robot],
+        stock: Optional[Stock] = None,
+        assembly_success_rate: float = settings.ASSEMBLY_SUCCESS_RATE,
+    ) -> None:
         if stock is None:
             stock = Stock()
 
         self.robots = robots
         self.stock: Stock = stock
         self.seconds_left = Seconds(0)
+        self.assembly_success_rate = assembly_success_rate
 
     def get_robot(self, robot_id: int) -> Robot:
         """Get the robot with the given id"""
@@ -290,7 +315,7 @@ class RoboticFactory:
     def assemble(self, robot_id: int) -> None:
         """Say robot to assemble foobar"""
         robot = self.get_robot(robot_id)
-        robot.state.assemble(self.stock)
+        robot.state.assemble(self.stock, self.assembly_success_rate)
 
     def run_round(self) -> None:
         """Run a given round"""
