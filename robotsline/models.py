@@ -7,7 +7,7 @@ import random
 import uuid
 from decimal import Decimal
 from itertools import count
-from typing import Counter, Iterator, Literal, NewType, Optional
+from typing import Iterable, Iterator, Literal, NewType, Optional
 
 from . import exceptions
 from .settings import Settings
@@ -37,14 +37,15 @@ class Location(enum.Enum):
             raise exceptions.UnknownLocation(name) from bad_location
 
 
-@dataclasses.dataclass
-class Material:
+class Material(abc.ABC):
     """A foe or a bar"""
 
-    name: Literal["foo"] | Literal["bar"]
+    name: str
     where_to_find_it: Location
     mining_time: Seconds
-    id_: uuid.UUID = dataclasses.field(default_factory=uuid.uuid4)
+
+    def __init__(self) -> None:
+        self.id_ = uuid.uuid4()
 
     @classmethod
     def from_name(
@@ -52,25 +53,38 @@ class Material:
     ) -> "Material":
         """New material from name"""
         if material_name.lower() == "foo":
-            return Material(
-                name="foo",
-                where_to_find_it=Location.FOO_MINE,
-                mining_time=Seconds(1),
-            )
+            return Foo()
         if material_name.lower() == "bar":
-            return Material(
-                name="bar",
-                where_to_find_it=Location.BAR_MINE,
-                mining_time=Seconds(random.randint(*mining_bar_range_time)),
-            )
+            return Bar.from_randomness(*mining_bar_range_time)
         raise exceptions.UnknownMaterial(material_name)
+
+
+class Foo(Material):
+    name: str = "foo"
+    where_to_find_it: Location = Location.FOO_MINE
+    mining_time = Seconds(1)
+
+
+class Bar(Material):
+    name: str = "bar"
+    where_to_find_it: Location = Location.BAR_MINE
+
+    def __init__(self, mining_time: Seconds):
+        super().__init__()
+        self.mining_time = mining_time
+
+    @classmethod
+    def from_randomness(cls, mining_time_min: int, mining_time_max: int) -> "Bar":
+        mining_time = Seconds(random.randint(mining_time_min, mining_time_max))
+        return cls(mining_time)
 
 
 @dataclasses.dataclass(frozen=True)
 class Foobar:
     """The final product"""
 
-    id_: uuid.UUID = dataclasses.field(default_factory=uuid.uuid4)
+    foo: Foo
+    bar: Bar
     price: Decimal = Decimal("1.00")
 
 
@@ -118,68 +132,54 @@ def robots_generator() -> Iterator[Robot]:
         yield Robot.from_id_generator(counter)
 
 
+@dataclasses.dataclass
 class Stock:
     """Material stock"""
 
-    def __init__(
-        self,
-        robots: list["Robot"],
-        foos_nb=0,
-        bars_nb=0,
-        foobars: Optional[list[Foobar]] = None,
-        money: Decimal = Decimal("0.00"),
-    ) -> None:
-        self.materials = Counter(foo=foos_nb, bar=bars_nb)
-        if foobars is None:
-            foobars = []
-        self.foobars: list[Foobar] = foobars
-        self.money = money
-        self.robots = robots
-        self._robot_generator = robots_generator()
+    robots: list[Robot]
+    foos: list[Foo] = dataclasses.field(default_factory=list)
+    bars: list[Bar] = dataclasses.field(default_factory=list)
+    foobars: list[Foobar] = dataclasses.field(default_factory=list)
+    money: Decimal = Decimal("0.00")
+    _robot_generator: Iterable[Robot] = dataclasses.field(default_factory=robots_generator)
 
     def add_robot(self) -> None:
         """Add a free robot to the factory"""
         self.robots.append(next(self._robot_generator))
 
-    @property
-    def foos(self) -> int:
-        """Get nb of foos in stock"""
-        return self.materials["foo"]
-
-    @property
-    def bars(self) -> int:
-        """Get nb of bars in stock"""
-        return self.materials["bar"]
-
     def has_enough_material(self) -> bool:
         """Check if wa have enough material to build a foobar"""
-        if self.foos < 1:
+        if len(self.foos) < 1:
             logger.error("Not enough foos in stock!")
             return False
-        if self.bars < 1:
+        if len(self.bars) < 1:
             logger.error("Not enough bars in stock!")
             return False
         return True
 
-    def start_assembling(self):
+    def start_assembling(self) -> Foobar:
         """Begin to assemble a new foobar"""
         if not self.has_enough_material():
             raise exceptions.NotEnoughMaterial
-        self.materials["foo"] -= 1
-        self.materials["bar"] -= 1
+        foo, bar = self.foos.pop(), self.bars.pop()
+        return Foobar(foo, bar)
 
-    def end_assembling_success(self):
+    def end_assembling_success(self, foobar: Foobar):
         """A new Foobar is built 😂"""
-        self.foobars.append(Foobar())
+        self.foobars.append(foobar)
 
-    def end_assembling_failure(self):
+    def end_assembling_failure(self, foobar: Foobar):
         """Oh no!! 😥"""
         # we still saved a bar...
-        self.materials["bar"] += 1
+        self.bars.append(foobar.bar)
 
     def new_material(self, material: Material):
         """Add a new material in stock"""
-        self.materials[material.name] += 1
+        match material:
+            case Foo():
+                self.foos.append(material)
+            case Bar():
+                self.bars.append(material)
 
     def start_selling(self, min_nb: int, max_nb: int) -> list[Foobar]:
         """Get foobars to sell"""
@@ -196,10 +196,12 @@ class Stock:
     def buy_robot(self, required_money: Decimal, required_foos: int):
         if required_money > self.money:
             raise exceptions.NotEnoughMaterial("Not enough money")
-        if required_foos > self.foos:
+        if required_foos > len(self.foos):
             raise exceptions.NotEnoughMaterial("Not enough foos")
         self.money -= required_money
-        self.materials["foo"] -= required_foos
+        for _ in range(required_foos):
+            self.foos.pop()
+
         self.add_robot()
 
     def get_robot(self, robot_id: int) -> Robot:
@@ -312,10 +314,11 @@ class Assembling(RobotState):
     LOCATION = Location.ASSEMBLY_LINE
 
     def __init__(
-        self, robot: "Robot", stock: Stock, assembly_success_rate: float
+            self, robot: "Robot", foobar: Foobar, stock: Stock, assembly_success_rate: float
     ) -> None:
         super().__init__(robot, countdown=Seconds(2), location=self.LOCATION)
         self.stock = stock
+        self.foobar = foobar
         self.assembly_success_rate = assembly_success_rate
 
     def __str__(self) -> str:
@@ -323,9 +326,9 @@ class Assembling(RobotState):
 
     def terminate(self) -> None:
         if random.random() <= self.assembly_success_rate:
-            self.stock.end_assembling_success()
+            self.stock.end_assembling_success(self.foobar)
         else:
-            self.stock.end_assembling_failure()
+            self.stock.end_assembling_failure(self.foobar)
         self.robot.state = Idle(self.robot, location=self.location)
 
 
@@ -367,12 +370,13 @@ class Idle(RobotState):
         if not self.location is Assembling.LOCATION:
             raise exceptions.InvalidTransition(f"Move to {Assembling.LOCATION} first")
         try:
-            stock.start_assembling()
+            foobar = stock.start_assembling()
         except exceptions.NotEnoughMaterial as missing_materials:
             raise exceptions.InvalidTransition from missing_materials
 
         self.robot.state = Assembling(
             self.robot,
+            foobar=foobar,
             stock=stock,
             assembly_success_rate=assembly_success_rate,
         )

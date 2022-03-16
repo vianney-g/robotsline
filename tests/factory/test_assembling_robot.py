@@ -6,11 +6,11 @@ from robotsline import commands, handlers, models
 from robotsline.settings import Settings
 
 
-def test_asking_a_robot_to_assemble_foo_and_bar():
+def test_asking_a_robot_to_assemble_foo_and_bar(stock_factory):
     # Given a factory with enough stock
     # And a robot at assembly line
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
-    stock = models.Stock(foos_nb=1, bars_nb=1, robots=[robot])
+    stock = stock_factory(foos_nb=1, bars_nb=1, robots=[robot])
     factory = models.RoboticFactory(stock=stock)
 
     # When I ask her to assemble
@@ -20,14 +20,14 @@ def test_asking_a_robot_to_assemble_foo_and_bar():
     # the robot is assembling
     assert robot.status == "Assembling a foobar..."
     # and stock is lower
-    assert factory.stock.foos == 0
-    assert factory.stock.bars == 0
+    assert len(factory.stock.foos) == 0
+    assert len(factory.stock.bars) == 0
 
 
-def test_asking_a_robot_to_assemble_but_she_is_busy():
+def test_asking_a_robot_to_assemble_but_she_is_busy(stock_factory):
     # Given a robot in a factory with enough stock, and a robot moving to the cafeteria
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
-    stock = models.Stock(foos_nb=1, bars_nb=1, robots=[robot])
+    stock = stock_factory(foos_nb=1, bars_nb=1, robots=[robot])
     factory = models.RoboticFactory(stock=stock)
     factory.move(robot.id_, destination="cafeteria")
 
@@ -38,18 +38,18 @@ def test_asking_a_robot_to_assemble_but_she_is_busy():
     # Then the robot is still moving
     assert robot.status == "Moving"
     # And stock didn't changed
-    assert factory.stock.foos == 1
-    assert factory.stock.bars == 1
+    assert len(factory.stock.foos) == 1
+    assert len(factory.stock.bars) == 1
     # And foobar is not yet produced
     assert factory.stock.foobars == []
 
 
-def test_it_always_takes_2_seconds_to_assemble_a_foobar():
+def test_it_always_takes_2_seconds_to_assemble_a_foobar(stock_factory):
     # Given a factory with a foo and a bar in stock
     # And 100% chance of assembling success
     # And a robot at assembly line
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
-    stock = models.Stock(foos_nb=1, bars_nb=1, foobars=[], robots=[robot])
+    stock = stock_factory(foos_nb=1, bars_nb=1, robots=[robot])
     settings = Settings(assembly_success_rate=1)
     factory = models.RoboticFactory(stock=stock, settings=settings)
 
@@ -63,18 +63,18 @@ def test_it_always_takes_2_seconds_to_assemble_a_foobar():
     assert robot.status == "Idle"
     assert robot.state.location == models.Location.ASSEMBLY_LINE
     # and stock is lower
-    assert factory.stock.foos == 0
-    assert factory.stock.bars == 0
+    assert len(factory.stock.foos) == 0
+    assert len(factory.stock.bars) == 0
     # but a foobar has been created
     assert len(stock.foobars) == 1
 
 
-def test_assembling_a_foobar_may_fail():
+def test_assembling_a_foobar_may_fail(stock_factory):
     # Given a factory with a foo and a bar in stock
     # And no chance at all of assembling success
     # And a robot at assembly line
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
-    stock = models.Stock(robots=[robot], foos_nb=1, bars_nb=1, foobars=[])
+    stock = stock_factory(robots=[robot], foos_nb=1, bars_nb=1)
     settings = Settings(assembly_success_rate=0)
     factory = models.RoboticFactory(stock=stock, settings=settings)
 
@@ -88,7 +88,7 @@ def test_assembling_a_foobar_may_fail():
     assert robot.status == "Idle"
     assert robot.state.location == models.Location.ASSEMBLY_LINE
     # and stock of foos is lower but the bar can be reused
-    assert factory.stock.foos == 0
-    assert factory.stock.bars == 1
+    assert len(factory.stock.foos) == 0
+    assert len(factory.stock.bars) == 1
     # And foobar has not been created
     assert len(stock.foobars) == 0

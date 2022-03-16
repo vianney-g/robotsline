@@ -61,7 +61,7 @@ def test_asking_a_robot_to_mine_something_but_she_is_at_the_wrong_mine(
 def test_mining_foo():
     # Given a robot at foo mine, and a factory with no foo stock
     robot = models.Robot(1, location=models.Location.FOO_MINE)
-    stock = models.Stock([robot], foos_nb=0)
+    stock = models.Stock([robot])
 
     factory = models.RoboticFactory(stock)
 
@@ -74,13 +74,13 @@ def test_mining_foo():
     assert robot.status == "Idle"
     assert robot.state.location == models.Location.FOO_MINE
     # And the stock of Foo increased
-    assert stock.foos == 1
+    assert len(stock.foos) == 1
 
 
 def test_mining_bar():
     # Given a robot at bar mine, and a factory with no bar stock
     robot = models.Robot(1, location=models.Location.BAR_MINE)
-    stock = models.Stock([robot], bars_nb=0)
+    stock = models.Stock([robot])
 
     settings = Settings(mining_bar_range_time=(1, 1))
     factory = models.RoboticFactory(stock=stock, settings=settings)
@@ -94,13 +94,13 @@ def test_mining_bar():
     assert robot.status == "Idle"
     assert robot.state.location == models.Location.BAR_MINE
     # And the stock of bars increased
-    assert stock.bars == 1
+    assert len(stock.bars) == 1
 
 
 def test_mining_bar_waiting_longer():
     # Given a robot at bar mine, and a factory with no bar stock
     robot = models.Robot(1, location=models.Location.BAR_MINE)
-    stock = models.Stock([robot], bars_nb=0)
+    stock = models.Stock([robot])
 
     # And mining bar may take a long time
     settings = Settings(mining_bar_range_time=(10, 10))

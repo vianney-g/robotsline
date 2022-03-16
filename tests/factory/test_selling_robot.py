@@ -17,7 +17,7 @@ def test_selling_at_the_wrong_place(wrong_place: models.Location):
     # Given a factory with enough stock
     # And a robot not in the material store
     robot = models.Robot(id_=1, location=wrong_place)
-    foobar = models.Foobar()
+    foobar = models.Foobar(models.Foo(), models.Bar(1))
     stock = models.Stock([robot], foobars=[foobar])
     factory = models.RoboticFactory(stock=stock)
 
@@ -48,7 +48,7 @@ def test_selling_foobars_gave_me_money(
     # Given a factory with some stock
     # And a robot not in the material store
     robot = models.Robot(id_=1, location=models.Location.MATERIAL_STORE)
-    foobars = [models.Foobar() for _ in range(initial_stock)]
+    foobars = [models.Foobar(models.Foo(), models.Bar(1)) for _ in range(initial_stock)]
     stock = models.Stock([robot], foobars=foobars)
     factory = models.RoboticFactory(stock=stock)
 

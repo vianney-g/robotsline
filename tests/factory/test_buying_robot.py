@@ -13,11 +13,11 @@ from robotsline import commands, handlers, models
         if location is not models.Location.ROBOTS_STORE
     ],
 )
-def test_buying_at_the_wrong_place(wrong_place: models.Location):
+def test_buying_at_the_wrong_place(wrong_place: models.Location, stock_factory):
     # Given a factory with some money and foos
     # And a robot not in the robot store
     robot = models.Robot(id_=1, location=wrong_place)
-    stock = models.Stock([robot], money=models.Decimal("10.00"), foos_nb=6)
+    stock = stock_factory([robot], money=models.Decimal("10.00"), foos_nb=6)
     factory = models.RoboticFactory(stock=stock)
 
     # When I ask her to buy a Robot
@@ -30,11 +30,11 @@ def test_buying_at_the_wrong_place(wrong_place: models.Location):
     assert robot.status == "Idle"
 
 
-def test_buying_a_robot_costs_money_and_foos():
+def test_buying_a_robot_costs_money_and_foos(stock_factory):
     # Given a factory with some money and foos
     # And a robot in the robot store
     robot = models.Robot(id_=1, location=models.Location.ROBOTS_STORE)
-    stock = models.Stock([robot], money=models.Decimal("10.00"), foos_nb=6)
+    stock = stock_factory([robot], money=models.Decimal("10.00"), foos_nb=6)
     factory = models.RoboticFactory(stock=stock)
 
     # When I ask her to buy a Robot
@@ -47,7 +47,7 @@ def test_buying_a_robot_costs_money_and_foos():
     assert robot.status == "Idle"
     # and we've got 6 foos and 3€ less
     assert stock.money == 7
-    assert stock.foos == 0
+    assert len(stock.foos) == 0
 
 
 @pytest.mark.parametrize(
@@ -58,11 +58,11 @@ def test_buying_a_robot_costs_money_and_foos():
         (2, 10),  # not enough money
     ],
 )
-def test_buying_a_robot_but_not_enough_resources(money: int, foos: int):
+def test_buying_a_robot_but_not_enough_resources(money: int, foos: int, stock_factory):
     # Given a factory with not enough money and/or foos
     # And a robot in the robot store
     robot = models.Robot(id_=1, location=models.Location.ROBOTS_STORE)
-    stock = models.Stock([robot], money=models.Decimal(money), foos_nb=foos)
+    stock = stock_factory([robot], money=models.Decimal(money), foos_nb=foos)
     factory = models.RoboticFactory(stock=stock)
 
     # When I ask her to buy a Robot
@@ -75,4 +75,4 @@ def test_buying_a_robot_but_not_enough_resources(money: int, foos: int):
     assert robot.status == "Idle"
     # and stock didn't changed
     assert stock.money == money
-    assert stock.foos == foos
+    assert len(stock.foos) == foos
