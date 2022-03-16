@@ -1,11 +1,12 @@
 """Domain models for a robotic factory"""
 import abc
+import dataclasses
 import enum
 import logging
 import random
 import uuid
 from itertools import count
-from typing import Iterable, Iterator, Literal, NewType, Optional
+from typing import Counter, Iterable, Iterator, Literal, NewType, Optional, Protocol
 
 from . import exceptions, settings
 
@@ -34,23 +35,84 @@ class Location(enum.Enum):
             raise exceptions.UnknownLocation(name) from bad_location
 
 
-class Material(enum.Enum):
-    """Valid materials"""
+@dataclasses.dataclass
+class Material:
+    name: str
+    where_to_find_it: Location
+    mining_time: Seconds
 
-    FOO = "foo"
-    BAR = "bar"
+    @classmethod
+    def from_name(cls, material_name) -> "Material":
+        """New material from name"""
+        if material_name.lower() == "foo":
+            return Material(
+                name="foo",
+                where_to_find_it=Location.FOO_MINE,
+                mining_time=Seconds(1),
+            )
+        if material_name.lower() == "bar":
+            return Material(
+                name="bar",
+                where_to_find_it=Location.BAR_MINE,
+                mining_time=Seconds(1),
+            )
+        raise exceptions.UnknownMaterial(material_name)
+
+
+Foobar = uuid.UUID
+
+
+class Stock:
+    """Material stock"""
+
+    def __init__(
+        self, foos_nb=0, bars_nb=0, foobars: Optional[list[Foobar]] = None
+    ) -> None:
+        self.materials = Counter(foo=foos_nb, bar=bars_nb)
+        if foobars is None:
+            foobars = []
+        self.foobars: list[Foobar] = foobars
 
     @property
-    def where_to_find_it(self) -> Location:
-        """Return the mine for the materia"""
-        locations = {
-            Material.FOO: Location.FOO_MINE,
-            Material.BAR: Location.BAR_MINE,
-        }
-        return locations[self]
+    def foos(self) -> int:
+        """Get nb of foos in stock"""
+        return self.materials["foo"]
 
-    def mine_time(self) -> Seconds:
-        return Seconds(5)
+    @property
+    def bars(self) -> int:
+        """Get nb of bars in stock"""
+        return self.materials["bar"]
+
+    def has_enough_material(self) -> bool:
+        """Check if wa have enough material to build a foobar"""
+        if self.foos < 1:
+            logger.error("Not enough foos in stock!")
+            return False
+        if self.bars < 1:
+            logger.error("Not enough bars in stock!")
+            return False
+        return True
+
+    def start_assembling(self):
+        """Begin to assemble a new foobar"""
+        if not self.has_enough_material():
+            raise exceptions.NotEnoughMaterial
+        self.materials["foo"] -= 1
+        self.materials["bar"] -= 1
+
+    def end_assembling_success(self):
+        """A new Foobar is built 😂"""
+        foobar = uuid.uuid4()
+        self.foobars.append(foobar)
+
+    def end_assembling_failure(self):
+        """Oh no!! 😥"""
+        # we still saved a bar...
+        self.materials["bar"] += 1
+
+    def new_material(self, material: Material):
+        """Add a new material in stock"""
+        self.materials[material.name] += 1
 
 
 class RobotState(abc.ABC):
@@ -64,19 +126,19 @@ class RobotState(abc.ABC):
     def __str__(self) -> str:
         return self.__class__.__name__
 
-    def idle(self, location: Location):
+    def idle(self, location: Location) -> None:
         """Set robot to idle state"""
         self.robot.state = Idle(self.robot, location)
 
-    def move(self, destination: Location):
+    def move(self, destination: Location) -> None:
         """Try to move the robot"""
         raise exceptions.InvalidTransition(f"Cannot move robot {self.robot}")
 
-    def mine(self, material: Material):
+    def mine(self, material: Material, stock: Stock) -> None:
         """Try to send the robot to mine"""
         raise exceptions.InvalidTransition(f"Cannot send robot {self.robot} to mine.")
 
-    def assemble(self, stock: "Stock", assembly_success_rate: float):
+    def assemble(self, stock: Stock, assembly_success_rate: float) -> None:
         """Try to send the robot to assembly line"""
         raise exceptions.InvalidTransition(
             f"Cannot send robot {self.robot} to assembly line."
@@ -123,16 +185,21 @@ class Moving(RobotState):
 class Mining(RobotState):
     """Robot is ⛏"""
 
-    def __init__(self, robot: "Robot", material: Material) -> None:
+    def __init__(self, robot: "Robot", material: Material, stock: Stock) -> None:
         super().__init__(
             robot,
-            countdown=material.mine_time(),
+            countdown=material.mining_time,
             location=material.where_to_find_it,
         )
         self.material = material
+        self.stock = stock
 
     def __str__(self) -> str:
-        return f"Mining {self.material.value} at {self.location.value.title()}"
+        return f"Mining {self.material.name} at {self.location.value.title()}"
+
+    def terminate(self) -> None:
+        self.stock.new_material(self.material)
+        self.robot.state = Idle(self.robot, self.location)
 
 
 class Assembling(RobotState):
@@ -141,7 +208,7 @@ class Assembling(RobotState):
     LOCATION = Location.ASSEMBLY_LINE
 
     def __init__(
-        self, robot: "Robot", stock: "Stock", assembly_success_rate: float
+        self, robot: "Robot", stock: Stock, assembly_success_rate: float
     ) -> None:
         super().__init__(robot, countdown=Seconds(2), location=self.LOCATION)
         self.stock = stock
@@ -167,14 +234,14 @@ class Idle(RobotState):
     def move(self, destination: Location):
         self.robot.state = Moving(self.robot, destination)
 
-    def mine(self, material: Material):
+    def mine(self, material: Material, stock: Stock):
         if self.location is material.where_to_find_it:
-            self.robot.state = Mining(self.robot, material)
+            self.robot.state = Mining(self.robot, material, stock)
         raise exceptions.InvalidTransition(
             f"Move to {material.where_to_find_it} before mining {material}"
         )
 
-    def assemble(self, stock: "Stock", assembly_success_rate: float):
+    def assemble(self, stock: Stock, assembly_success_rate: float):
         if not self.location is Assembling.LOCATION:
             raise exceptions.InvalidTransition(f"Move to {Assembling.location} first")
         try:
@@ -233,49 +300,6 @@ def robots_generator() -> Iterable[Robot]:
         yield Robot.from_id_generator(counter)
 
 
-Foobar = uuid.UUID
-
-
-class Stock:
-    """Material stock"""
-
-    def __init__(
-        self, foos_nb=0, bars_nb=0, foobars: Optional[list[Foobar]] = None
-    ) -> None:
-        self.foos: int = foos_nb
-        self.bars: int = bars_nb
-        if foobars is None:
-            foobars = []
-        self.foobars: list[Foobar] = foobars
-
-    def has_enough_material(self) -> bool:
-        """Check if wa have enough material to build a foobar"""
-        if self.foos < 1:
-            logger.error("Not enough foos in stock!")
-            return False
-        if self.bars < 1:
-            logger.error("Not enough bars in stock!")
-            return False
-        return True
-
-    def start_assembling(self):
-        """Begin to assemble a new foobar"""
-        if not self.has_enough_material():
-            raise exceptions.NotEnoughMaterial
-        self.foos -= 1
-        self.bars -= 1
-
-    def end_assembling_success(self):
-        """A new Foobar is built 😂"""
-        foobar = uuid.uuid4()
-        self.foobars.append(foobar)
-
-    def end_assembling_failure(self):
-        """Oh no!! 😥"""
-        # we still saved a bar...
-        self.bars += 1
-
-
 class RoboticFactory:
     """Outstanding Robotic factory 🏭"""
 
@@ -307,10 +331,10 @@ class RoboticFactory:
         robot = self.get_robot(robot_id)
         robot.state.move(true_destination)
 
-    def mine(self, robot_id: int, material: Material) -> None:
+    def mine(self, robot_id: int, material: str) -> None:
         """Say robot to move"""
         robot = self.get_robot(robot_id)
-        robot.state.mine(material)
+        robot.state.mine(Material.from_name(material), self.stock)
 
     def assemble(self, robot_id: int) -> None:
         """Say robot to assemble foobar"""

@@ -27,13 +27,7 @@ def move(command: commands.MoveRobot, on_factory: models.RoboticFactory) -> None
 @_handler.register
 def mine(command: commands.Mine, on_factory: models.RoboticFactory) -> None:
     """Ask a robot to mine"""
-    try:
-        material = models.Material(command.material)
-    except ValueError as unknown_material:
-        logger.error(unknown_material)
-        return
-
-    on_factory.mine(robot_id=command.robot_id, material=material)
+    on_factory.mine(robot_id=command.robot_id, material=command.material)
 
 
 @_handler.register
@@ -41,10 +35,12 @@ def assemble(command: commands.Assemble, on_factory: models.RoboticFactory) -> N
     """Ask a robot to mine"""
     on_factory.assemble(robot_id=command.robot_id)
 
+
 @_handler.register
 def wait(command: commands.Wait, on_factory: models.RoboticFactory) -> None:
     """Ask a robot to mine"""
     on_factory.wait(seconds=command.seconds)
+
 
 def ignore_domain_errors(function: Handler):
     """Log domain errors but do not raise them"""

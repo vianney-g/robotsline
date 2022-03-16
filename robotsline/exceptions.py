@@ -15,3 +15,7 @@ class NotEnoughMaterial(DomainError):
 
 class UnknownLocation(DomainError):
     """We don't know where you are 🤷"""
+
+
+class UnknownMaterial(DomainError):
+    """What's that?"""

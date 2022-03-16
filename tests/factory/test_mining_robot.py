@@ -14,7 +14,7 @@ def test_asking_a_robot_to_mine_something(material: str, at_mine: models.Locatio
     robot = models.Robot(1, location=at_mine)
     factory = models.RoboticFactory(robots=[robot])
 
-    # When I ask it to mine
+    # When I ask her to mine
     mine = commands.Mine(robot_id=robot.id_, material=material)
     handlers.execute(mine, on_factory=factory)
 
@@ -27,7 +27,7 @@ def test_asking_a_robot_to_mine_a_bad_material():
     robot = models.Robot(id_=1)
     factory = models.RoboticFactory([robot])
 
-    # When I ask it to mine a strange material
+    # When I ask her to mine a strange material
     mine = commands.Mine(robot_id=robot.id_, material="💰")
     handlers.execute(mine, on_factory=factory)
 
@@ -46,9 +46,46 @@ def test_asking_a_robot_to_mine_something_but_she_is_at_the_wrong_mine(
     robot = models.Robot(1, location=at_mine)
     factory = models.RoboticFactory([robot])
 
-    # When I ask it to mine the wrong material
+    # When I ask her to mine the wrong material
     mine = commands.Mine(robot_id=robot.id_, material=wrong_material)
     handlers.execute(mine, on_factory=factory)
 
     # the robot is still idle
     assert robot.status == "Idle"
+
+
+def test_mining_foo():
+    # Given a robot at foo mine, and a factory with no foo stock
+    robot = models.Robot(1, location=models.Location.FOO_MINE)
+    stock = models.Stock(foos_nb=0)
+
+    factory = models.RoboticFactory([robot], stock=stock)
+
+    # When I ask her to mine foo for 1 second
+    mine = commands.Mine(robot_id=1, material="foo")
+    handlers.execute(mine, on_factory=factory)
+    handlers.execute(commands.Wait(seconds=1), on_factory=factory)
+
+    # the robot is idling at the mine
+    assert robot.status == "Idle"
+    assert robot.state.location == models.Location.FOO_MINE
+    # And the stock of Foo increased
+    assert stock.foos == 1
+
+def test_mining_bar():
+    # Given a robot at bar mine, and a factory with no foo stock
+    robot = models.Robot(1, location=models.Location.FOO_MINE)
+    stock = models.Stock(foos_nb=0)
+
+    factory = models.RoboticFactory([robot], stock=stock)
+
+    # When I ask her to mine foo for 1 second
+    mine = commands.Mine(robot_id=1, material="foo")
+    handlers.execute(mine, on_factory=factory)
+    handlers.execute(commands.Wait(seconds=1), on_factory=factory)
+
+    # the robot is idling at the mine
+    assert robot.status == "Idle"
+    assert robot.state.location == models.Location.FOO_MINE
+    # And the stock of Foo increased
+    assert stock.foos == 1
