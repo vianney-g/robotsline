@@ -26,3 +26,10 @@ class Assemble:
     """Ask a robot to assemble"""
 
     robot_id: int
+
+
+@dataclasses.dataclass(frozen=True)
+class Wait:
+    """Wait a given number of seconds"""
+
+    seconds: int

@@ -41,6 +41,10 @@ def assemble(command: commands.Assemble, on_factory: models.RoboticFactory) -> N
     """Ask a robot to mine"""
     on_factory.assemble(robot_id=command.robot_id)
 
+@_handler.register
+def wait(command: commands.Wait, on_factory: models.RoboticFactory) -> None:
+    """Ask a robot to mine"""
+    on_factory.wait(seconds=command.seconds)
 
 def ignore_domain_errors(function: Handler):
     """Log domain errors but do not raise them"""

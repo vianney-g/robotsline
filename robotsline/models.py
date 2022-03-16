@@ -10,6 +10,8 @@ from . import exceptions
 
 logger = logging.getLogger(__name__)
 
+Seconds = NewType("Seconds", int)
+
 
 class Location(enum.Enum):
     """Where robots can go"""
@@ -46,17 +48,24 @@ class Material(enum.Enum):
         }
         return locations[self]
 
+    def mine_time(self) -> Seconds:
+        return Seconds(5)
+
 
 class RobotState(abc.ABC):
     """Abstract robot state"""
 
-    location: Location
-
-    def __init__(self, robot: "Robot") -> None:
+    def __init__(self, robot: "Robot", countdown: Seconds, location: Location) -> None:
         self.robot = robot
+        self.countdown = countdown
+        self.location = location
 
     def __str__(self) -> str:
         return self.__class__.__name__
+
+    def idle(self, location: Location):
+        """Set robot to idle state"""
+        self.robot.state = Idle(self.robot, location)
 
     def move(self, destination: Location):
         """Try to move the robot"""
@@ -75,31 +84,51 @@ class RobotState(abc.ABC):
     def haunt(self):
         """Try to make the robot haunting"""
         if self.robot:
-            raise exceptions.InvalidTransition(f"Robot is not a ghost")
+            raise exceptions.InvalidTransition("Robot is not a ghost")
         self.robot.state = Haunting(self.robot)
+
+    def terminate(self) -> None:
+        """Task is done"""
+
+    def run_round(self) -> None:
+        """A second of time..."""
+        self.countdown -= Seconds(1)
+        if self.countdown == Seconds(0):
+            self.terminate()
 
 
 class Haunting(RobotState):
     """👻"""
 
+    def __init__(self, robot: "Robot"):
+        location = Location.ON_MY_WAY
+        countdown = Seconds(999_999_999)
+        super().__init__(robot, countdown, location)
+
 
 class Moving(RobotState):
     """Robot is 🚶"""
 
-    location = Location.ON_MY_WAY
+    DURATION: Seconds = Seconds(5)
 
     def __init__(self, robot: "Robot", destination: Location):
-        super().__init__(robot)
+        super().__init__(robot, self.DURATION, Location.ON_MY_WAY)
         self.destination = destination
+
+    def terminate(self) -> None:
+        self.robot.state = Idle(self.robot, location=self.destination)
 
 
 class Mining(RobotState):
     """Robot is ⛏"""
 
     def __init__(self, robot: "Robot", material: Material) -> None:
-        super().__init__(robot)
+        super().__init__(
+            robot,
+            countdown=material.mine_time(),
+            location=material.where_to_find_it,
+        )
         self.material = material
-        self.location = material.where_to_find_it
 
     def __str__(self) -> str:
         return f"Mining {self.material.value} at {self.location.value.title()}"
@@ -108,10 +137,10 @@ class Mining(RobotState):
 class Assembling(RobotState):
     """Robot is assembling"""
 
-    location = Location.ASSEMBLY_LINE
+    LOCATION = Location.ASSEMBLY_LINE
 
     def __init__(self, robot: "Robot", stock: "Stock") -> None:
-        super().__init__(robot)
+        super().__init__(robot, countdown=Seconds(2), location=self.LOCATION)
         self.stock = stock
 
     def __str__(self) -> str:
@@ -122,8 +151,7 @@ class Idle(RobotState):
     """Robot is sleeping 😴"""
 
     def __init__(self, robot: "Robot", location: Location) -> None:
-        super().__init__(robot)
-        self.location = location
+        super().__init__(robot, countdown=Seconds(0), location=location)
 
     def move(self, destination: Location):
         self.robot.state = Moving(self.robot, destination)
@@ -136,7 +164,7 @@ class Idle(RobotState):
         )
 
     def assemble(self, stock: "Stock"):
-        if not self.location is Assembling.location:
+        if not self.location is Assembling.LOCATION:
             raise exceptions.InvalidTransition(f"Move to {Assembling.location} first")
         try:
             stock.start_assembling()
@@ -158,6 +186,9 @@ class Robot:
     def __init__(self, id_: RobotId, location: Location = Location.CAFETERIA):
         self.id_ = id_
         self.state: RobotState = Idle(self, location)
+
+    def run_round(self) -> None:
+        self.state.run_round()
 
     @property
     def status(self) -> str:
@@ -232,6 +263,7 @@ class RoboticFactory:
     def __init__(self, robots: list[Robot], stock: Stock) -> None:
         self.robots = robots
         self.stock = stock
+        self.seconds_left = Seconds(0)
 
     def get_robot(self, robot_id: int) -> Robot:
         """Get the robot with the given id"""
@@ -256,3 +288,14 @@ class RoboticFactory:
         """Say robot to assemble foobar"""
         robot = self.get_robot(robot_id)
         robot.state.assemble(self.stock)
+
+    def run_round(self) -> None:
+        """Run a given round"""
+        for robot in self.robots:
+            robot.run_round()
+        self.seconds_left += 1
+
+    def wait(self, seconds: int) -> None:
+        """Simulate some seconds in the factory"""
+        for _ in range(seconds):
+            self.run_round()
