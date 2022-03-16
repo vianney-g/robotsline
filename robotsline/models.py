@@ -443,6 +443,8 @@ class RoboticFactory:
 
     def run_round(self) -> None:
         """Run a given round"""
+        if len(self.stock.robots) >= self.settings.limit_of_robots_for_game_over:
+            raise exceptions.GameOver
         for robot in self.stock.robots:
             robot.run_round()
         self.seconds_left += 1

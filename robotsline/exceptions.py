@@ -10,7 +10,7 @@ class InvalidTransition(DomainError):
 
 
 class NotEnoughMaterial(DomainError):
-    """Not enough material to build foobar"""
+    """Not enough material to build or buy something"""
 
 
 class UnknownLocation(DomainError):
@@ -19,3 +19,7 @@ class UnknownLocation(DomainError):
 
 class UnknownMaterial(DomainError):
     """What's that?"""
+
+
+class GameOver(Exception):
+    """👋"""
