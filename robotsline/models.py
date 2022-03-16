@@ -8,7 +8,8 @@ import uuid
 from itertools import count
 from typing import Counter, Iterable, Iterator, Literal, NewType, Optional, Protocol
 
-from . import exceptions, settings
+from . import exceptions
+from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +308,7 @@ class RoboticFactory:
         self,
         robots: list[Robot],
         stock: Optional[Stock] = None,
-        assembly_success_rate: float = settings.ASSEMBLY_SUCCESS_RATE,
+        settings: Settings = Settings(),
     ) -> None:
         if stock is None:
             stock = Stock()
@@ -315,7 +316,7 @@ class RoboticFactory:
         self.robots = robots
         self.stock: Stock = stock
         self.seconds_left = Seconds(0)
-        self.assembly_success_rate = assembly_success_rate
+        self.settings = settings
 
     def get_robot(self, robot_id: int) -> Robot:
         """Get the robot with the given id"""
@@ -339,7 +340,7 @@ class RoboticFactory:
     def assemble(self, robot_id: int) -> None:
         """Say robot to assemble foobar"""
         robot = self.get_robot(robot_id)
-        robot.state.assemble(self.stock, self.assembly_success_rate)
+        robot.state.assemble(self.stock, self.settings.assembly_success_rate)
 
     def run_round(self) -> None:
         """Run a given round"""

@@ -3,6 +3,7 @@
 
 
 from robotsline import commands, handlers, models
+from robotsline.settings import Settings
 
 
 def test_asking_a_robot_to_assemble_foo_and_bar():
@@ -49,7 +50,8 @@ def test_it_always_takes_2_seconds_to_assemble_a_foobar():
     # And a robot at assembly line
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
     stock = models.Stock(foos_nb=1, bars_nb=1, foobars=[])
-    factory = models.RoboticFactory([robot], stock=stock, assembly_success_rate=1)
+    settings = Settings(assembly_success_rate=1)
+    factory = models.RoboticFactory([robot], stock=stock, settings=settings)
 
     # When I ask her to assemble a foobar
     # And I wait 2 seconds
@@ -73,7 +75,8 @@ def test_assembling_a_foobar_may_fail():
     # And a robot at assembly line
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
     stock = models.Stock(foos_nb=1, bars_nb=1, foobars=[])
-    factory = models.RoboticFactory([robot], stock=stock, assembly_success_rate=0)
+    settings = Settings(assembly_success_rate=0)
+    factory = models.RoboticFactory([robot], stock=stock, settings=settings)
 
     # When I ask her to assemble a foobar
     # And I wait 2 seconds

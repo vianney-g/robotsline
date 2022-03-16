@@ -72,20 +72,21 @@ def test_mining_foo():
     # And the stock of Foo increased
     assert stock.foos == 1
 
+
 def test_mining_bar():
-    # Given a robot at bar mine, and a factory with no foo stock
-    robot = models.Robot(1, location=models.Location.FOO_MINE)
-    stock = models.Stock(foos_nb=0)
+    # Given a robot at bar mine, and a factory with no bar stock
+    robot = models.Robot(1, location=models.Location.BAR_MINE)
+    stock = models.Stock(bars_nb=0)
 
     factory = models.RoboticFactory([robot], stock=stock)
 
-    # When I ask her to mine foo for 1 second
-    mine = commands.Mine(robot_id=1, material="foo")
+    # When I ask her to mine bar for 1 second
+    mine = commands.Mine(robot_id=1, material="bar")
     handlers.execute(mine, on_factory=factory)
     handlers.execute(commands.Wait(seconds=1), on_factory=factory)
 
     # the robot is idling at the mine
     assert robot.status == "Idle"
-    assert robot.state.location == models.Location.FOO_MINE
+    assert robot.state.location == models.Location.BAR_MINE
     # And the stock of Foo increased
-    assert stock.foos == 1
+    assert stock.bars == 1
