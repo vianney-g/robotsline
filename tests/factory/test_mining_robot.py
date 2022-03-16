@@ -13,7 +13,8 @@ from robotsline.settings import Settings
 def test_asking_a_robot_to_mine_something(material: str, at_mine: models.Location):
     # Given a robot at the mine
     robot = models.Robot(1, location=at_mine)
-    factory = models.RoboticFactory(robots=[robot])
+    stock = models.Stock([robot])
+    factory = models.RoboticFactory(stock)
 
     # When I ask her to mine
     mine = commands.Mine(robot_id=robot.id_, material=material)
@@ -26,7 +27,8 @@ def test_asking_a_robot_to_mine_something(material: str, at_mine: models.Locatio
 def test_asking_a_robot_to_mine_a_bad_material():
     # Given a robot in a factory
     robot = models.Robot(id_=1)
-    factory = models.RoboticFactory([robot])
+    stock = models.Stock([robot])
+    factory = models.RoboticFactory(stock)
 
     # When I ask her to mine a strange material
     mine = commands.Mine(robot_id=robot.id_, material="💰")
@@ -45,7 +47,8 @@ def test_asking_a_robot_to_mine_something_but_she_is_at_the_wrong_mine(
 ):
     # Given a robot at the mine
     robot = models.Robot(1, location=at_mine)
-    factory = models.RoboticFactory([robot])
+    stock = models.Stock([robot])
+    factory = models.RoboticFactory(stock)
 
     # When I ask her to mine the wrong material
     mine = commands.Mine(robot_id=robot.id_, material=wrong_material)
@@ -58,9 +61,9 @@ def test_asking_a_robot_to_mine_something_but_she_is_at_the_wrong_mine(
 def test_mining_foo():
     # Given a robot at foo mine, and a factory with no foo stock
     robot = models.Robot(1, location=models.Location.FOO_MINE)
-    stock = models.Stock(foos_nb=0)
+    stock = models.Stock([robot], foos_nb=0)
 
-    factory = models.RoboticFactory([robot], stock=stock)
+    factory = models.RoboticFactory(stock)
 
     # When I ask her to mine foo for 1 second
     mine = commands.Mine(robot_id=1, material="foo")
@@ -77,10 +80,10 @@ def test_mining_foo():
 def test_mining_bar():
     # Given a robot at bar mine, and a factory with no bar stock
     robot = models.Robot(1, location=models.Location.BAR_MINE)
-    stock = models.Stock(bars_nb=0)
+    stock = models.Stock([robot], bars_nb=0)
 
     settings = Settings(mining_bar_range_time=(1, 1))
-    factory = models.RoboticFactory([robot], stock=stock, settings=settings)
+    factory = models.RoboticFactory(stock=stock, settings=settings)
 
     # When I ask her to mine bar for 1 second
     mine = commands.Mine(robot_id=1, material="bar")
@@ -97,11 +100,11 @@ def test_mining_bar():
 def test_mining_bar_waiting_longer():
     # Given a robot at bar mine, and a factory with no bar stock
     robot = models.Robot(1, location=models.Location.BAR_MINE)
-    stock = models.Stock(bars_nb=0)
+    stock = models.Stock([robot], bars_nb=0)
 
     # And mining bar may take a long time
     settings = Settings(mining_bar_range_time=(10, 10))
-    factory = models.RoboticFactory([robot], stock=stock, settings=settings)
+    factory = models.RoboticFactory(stock=stock, settings=settings)
 
     # When I ask her to mine bar for 1 second
     mine = commands.Mine(robot_id=1, material="bar")

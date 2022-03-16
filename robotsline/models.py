@@ -7,7 +7,7 @@ import random
 import uuid
 from decimal import Decimal
 from itertools import count
-from typing import Counter, Iterable, Iterator, Literal, NewType, Optional
+from typing import Counter, Iterator, Literal, NewType, Optional
 
 from . import exceptions
 from .settings import Settings
@@ -39,9 +39,12 @@ class Location(enum.Enum):
 
 @dataclasses.dataclass
 class Material:
-    name: str
+    """A foe or a bar"""
+
+    name: Literal["foo"] | Literal["bar"]
     where_to_find_it: Location
     mining_time: Seconds
+    id_: uuid.UUID = dataclasses.field(default_factory=uuid.uuid4)
 
     @classmethod
     def from_name(
@@ -71,11 +74,56 @@ class Foobar:
     price: Decimal = Decimal("1.00")
 
 
+RobotId = int | Literal["Ghost"]
+RobotIdGenerator = Iterator[RobotId]
+
+
+class Robot:
+    """Robot in a factory 🤖.
+    Beware a ghost may be haunting the factory
+    """
+
+    def __init__(self, id_: RobotId, location: Location = Location.CAFETERIA):
+        self.id_ = id_
+        self.state: RobotState = Idle(self, location)
+
+    def run_round(self) -> None:
+        self.state.run_round()
+
+    @property
+    def status(self) -> str:
+        """Return robot state as string"""
+        return str(self.state)
+
+    @classmethod
+    def from_id_generator(cls, id_generator: RobotIdGenerator) -> "Robot":
+        """Build a new robot from a sequence"""
+        return cls(next(id_generator))
+
+    @classmethod
+    def ghost(cls) -> "Robot":
+        """Build a nullable robot 👻"""
+        robot = cls(id_="Ghost")
+        robot.state = Haunting(robot)
+        return robot
+
+    def __bool__(self) -> bool:
+        return self.id_ == "Ghost"
+
+
+def robots_generator() -> Iterator[Robot]:
+    """Generate some robots whose ids starting with 1"""
+    counter = count(start=1)
+    while True:
+        yield Robot.from_id_generator(counter)
+
+
 class Stock:
     """Material stock"""
 
     def __init__(
         self,
+        robots: list["Robot"],
         foos_nb=0,
         bars_nb=0,
         foobars: Optional[list[Foobar]] = None,
@@ -86,6 +134,12 @@ class Stock:
             foobars = []
         self.foobars: list[Foobar] = foobars
         self.money = money
+        self.robots = robots
+        self._robot_generator = robots_generator()
+
+    def add_robot(self) -> None:
+        """Add a free robot to the factory"""
+        self.robots.append(next(self._robot_generator))
 
     @property
     def foos(self) -> int:
@@ -139,6 +193,23 @@ class Stock:
         logger.info("%s Foobar(s) sold", len(foobars))
         self.money += sum(foobar.price for foobar in foobars)
 
+    def buy_robot(self, required_money: Decimal, required_foos: int):
+        if required_money > self.money:
+            raise exceptions.NotEnoughMaterial("Not enough money")
+        if required_foos > self.foos:
+            raise exceptions.NotEnoughMaterial("Not enough foos")
+        self.money -= required_money
+        self.materials["foo"] -= required_foos
+        self.add_robot()
+
+    def get_robot(self, robot_id: int) -> Robot:
+        """Get the robot with the given id"""
+        for robot in self.robots:
+            if robot.id_ == robot_id:
+                return robot
+        logger.error("Robot %s not found", robot_id)
+        return Robot.ghost()
+
 
 class RobotState(abc.ABC):
     """Abstract robot state"""
@@ -171,9 +242,11 @@ class RobotState(abc.ABC):
 
     def sell(self, stock: Stock, min_nb: int, max_nb: int) -> None:
         """Try to tell the robot to sell some foobars"""
-        raise exceptions.InvalidTransition(
-            f"Cannot send robot {self.robot} to assembly line."
-        )
+        raise exceptions.InvalidTransition("Cannot sell foobar")
+
+    def buy(self, stock: Stock, required_money: Decimal, required_foos: int) -> None:
+        """Try to buy a robot"""
+        raise exceptions.InvalidTransition("Cannot buy robot")
 
     def haunt(self):
         """Try to make the robot haunting"""
@@ -311,49 +384,10 @@ class Idle(RobotState):
         foobars = stock.start_selling(min_nb, max_nb)
         self.robot.state = Sell(self.robot, stock=stock, foobars=foobars)
 
-
-RobotId = int | Literal["Ghost"]
-RobotIdGenerator = Iterator[RobotId]
-
-
-class Robot:
-    """Robot in a factory 🤖.
-    Beware a ghost may be haunting the factory
-    """
-
-    def __init__(self, id_: RobotId, location: Location = Location.CAFETERIA):
-        self.id_ = id_
-        self.state: RobotState = Idle(self, location)
-
-    def run_round(self) -> None:
-        self.state.run_round()
-
-    @property
-    def status(self) -> str:
-        """Return robot state as string"""
-        return str(self.state)
-
-    @classmethod
-    def from_id_generator(cls, id_generator: RobotIdGenerator) -> "Robot":
-        """Build a new robot from a sequence"""
-        return cls(next(id_generator))
-
-    @classmethod
-    def ghost(cls) -> "Robot":
-        """Build a nullable robot 👻"""
-        robot = cls(id_="Ghost")
-        robot.state = Haunting(robot)
-        return robot
-
-    def __bool__(self) -> bool:
-        return self.id_ == "Ghost"
-
-
-def robots_generator() -> Iterable[Robot]:
-    """Generate some robots whose ids starting with 1"""
-    counter = count(start=1)
-    while True:
-        yield Robot.from_id_generator(counter)
+    def buy(self, stock: Stock, required_money: Decimal, required_foos: int) -> None:
+        if not self.location is Location.ROBOTS_STORE:
+            raise exceptions.InvalidTransition(f"Move to {Location.ROBOTS_STORE} first")
+        stock.buy_robot(required_money, required_foos)
 
 
 class RoboticFactory:
@@ -361,36 +395,26 @@ class RoboticFactory:
 
     def __init__(
         self,
-        robots: list[Robot],
         stock: Optional[Stock] = None,
         settings: Settings = Settings(),
     ) -> None:
 
         if stock is None:
-            stock = Stock()
+            stock = Stock([])
 
         self.stock: Stock = stock
-        self.robots = robots
         self.seconds_left = Seconds(0)
         self.settings = settings
-
-    def get_robot(self, robot_id: int) -> Robot:
-        """Get the robot with the given id"""
-        for robot in self.robots:
-            if robot.id_ == robot_id:
-                return robot
-        logger.error("Robot %s not found", robot_id)
-        return Robot.ghost()
 
     def move(self, robot_id: int, destination: str) -> None:
         """Say robot to move"""
         true_destination = Location.by_name(destination.lower())
-        robot = self.get_robot(robot_id)
+        robot = self.stock.get_robot(robot_id)
         robot.state.move(true_destination)
 
     def mine(self, robot_id: int, material: str) -> None:
         """Say robot to move"""
-        robot = self.get_robot(robot_id)
+        robot = self.stock.get_robot(robot_id)
         true_material = Material.from_name(
             material, self.settings.mining_bar_range_time
         )
@@ -398,18 +422,24 @@ class RoboticFactory:
 
     def assemble(self, robot_id: int) -> None:
         """Say robot to assemble foobar"""
-        robot = self.get_robot(robot_id)
+        robot = self.stock.get_robot(robot_id)
         robot.state.assemble(self.stock, self.settings.assembly_success_rate)
 
     def sell(self, robot_id: int) -> None:
         """Say robot to sell foobars"""
-        robot = self.get_robot(robot_id)
+        robot = self.stock.get_robot(robot_id)
         min_nb, max_nb = self.settings.foobars_selling_range
         robot.state.sell(self.stock, min_nb, max_nb)
 
+    def buy_robot(self, robot_id: int) -> None:
+        """Say robot to buy a new buddy"""
+        robot = self.stock.get_robot(robot_id)
+        required_money, required_foos = self.settings.robot_cost
+        robot.state.buy(self.stock, Decimal(required_money), required_foos)
+
     def run_round(self) -> None:
         """Run a given round"""
-        for robot in self.robots:
+        for robot in self.stock.robots:
             robot.run_round()
         self.seconds_left += 1
 

@@ -10,8 +10,8 @@ def test_asking_a_robot_to_assemble_foo_and_bar():
     # Given a factory with enough stock
     # And a robot at assembly line
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
-    stock = models.Stock(foos_nb=1, bars_nb=1)
-    factory = models.RoboticFactory(robots=[robot], stock=stock)
+    stock = models.Stock(foos_nb=1, bars_nb=1, robots=[robot])
+    factory = models.RoboticFactory(stock=stock)
 
     # When I ask her to assemble
     assemble = commands.Assemble(robot_id=robot.id_)
@@ -27,8 +27,8 @@ def test_asking_a_robot_to_assemble_foo_and_bar():
 def test_asking_a_robot_to_assemble_but_she_is_busy():
     # Given a robot in a factory with enough stock, and a robot moving to the cafeteria
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
-    stock = models.Stock(foos_nb=1, bars_nb=1)
-    factory = models.RoboticFactory(robots=[robot], stock=stock)
+    stock = models.Stock(foos_nb=1, bars_nb=1, robots=[robot])
+    factory = models.RoboticFactory(stock=stock)
     factory.move(robot.id_, destination="cafeteria")
 
     # When I ask her to assemble
@@ -49,9 +49,9 @@ def test_it_always_takes_2_seconds_to_assemble_a_foobar():
     # And 100% chance of assembling success
     # And a robot at assembly line
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
-    stock = models.Stock(foos_nb=1, bars_nb=1, foobars=[])
+    stock = models.Stock(foos_nb=1, bars_nb=1, foobars=[], robots=[robot])
     settings = Settings(assembly_success_rate=1)
-    factory = models.RoboticFactory([robot], stock=stock, settings=settings)
+    factory = models.RoboticFactory(stock=stock, settings=settings)
 
     # When I ask her to assemble a foobar
     # And I wait 2 seconds
@@ -74,9 +74,9 @@ def test_assembling_a_foobar_may_fail():
     # And no chance at all of assembling success
     # And a robot at assembly line
     robot = models.Robot(id_=1, location=models.Location.ASSEMBLY_LINE)
-    stock = models.Stock(foos_nb=1, bars_nb=1, foobars=[])
+    stock = models.Stock(robots=[robot], foos_nb=1, bars_nb=1, foobars=[])
     settings = Settings(assembly_success_rate=0)
-    factory = models.RoboticFactory([robot], stock=stock, settings=settings)
+    factory = models.RoboticFactory(stock=stock, settings=settings)
 
     # When I ask her to assemble a foobar
     # And I wait 2 seconds

@@ -40,3 +40,10 @@ class SellFoobars:
     """Sell some foobars"""
 
     robot_id: int
+
+
+@dataclasses.dataclass(frozen=True)
+class BuyRobot:
+    """Get a new buddy 🤖"""
+
+    robot_id: int

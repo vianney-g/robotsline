@@ -1,4 +1,4 @@
-"""Test robot mining"""
+"""Test selling robot"""
 # pylint: disable=missing-docstring
 import pytest
 
@@ -18,8 +18,8 @@ def test_selling_at_the_wrong_place(wrong_place: models.Location):
     # And a robot not in the material store
     robot = models.Robot(id_=1, location=wrong_place)
     foobar = models.Foobar()
-    stock = models.Stock(foobars=[foobar])
-    factory = models.RoboticFactory(robots=[robot], stock=stock)
+    stock = models.Stock([robot], foobars=[foobar])
+    factory = models.RoboticFactory(stock=stock)
 
     # When I ask her to sell a foobar and wait 10s
     sell = commands.SellFoobars(robot_id=robot.id_)
@@ -49,8 +49,8 @@ def test_selling_foobars_gave_me_money(
     # And a robot not in the material store
     robot = models.Robot(id_=1, location=models.Location.MATERIAL_STORE)
     foobars = [models.Foobar() for _ in range(initial_stock)]
-    stock = models.Stock(foobars=foobars)
-    factory = models.RoboticFactory(robots=[robot], stock=stock)
+    stock = models.Stock([robot], foobars=foobars)
+    factory = models.RoboticFactory(stock=stock)
 
     # When I ask her to sell some foobars
     assemble = commands.SellFoobars(robot_id=robot.id_)

@@ -6,7 +6,8 @@ from robotsline import commands, handlers, models
 def test_a_robot_can_be_moved():
     # Given an idle robot at the cafeteria
     robot = models.Robot(1, location=models.Location.CAFETERIA)
-    factory = models.RoboticFactory([robot])
+    stock = models.Stock([robot])
+    factory = models.RoboticFactory(stock)
 
     # When I ask her to move to foo_mine
     move_robot = commands.MoveRobot(robot_id=robot.id_, destination="Foo Mine")
@@ -21,7 +22,8 @@ def test_a_moving_robot_cannot_be_rerouted():
     # Given a robot moving from store to cafeteria
     robot = models.Robot(1, location=models.Location.ROBOTS_STORE)
     robot.state.move(destination=models.Location.CAFETERIA)
-    factory = models.RoboticFactory([robot])
+    stock = models.Stock([robot])
+    factory = models.RoboticFactory(stock)
 
     # When I ask her to move at the foo mine
     move_robot = commands.MoveRobot(robot_id=robot.id_, destination="Foo Mine")
@@ -35,7 +37,8 @@ def test_a_moving_robot_cannot_be_rerouted():
 def test_after_a_move_robot_is_idling_at_destination():
     # Given an idle robot at the cafeteria
     robot = models.Robot(1, location=models.Location.CAFETERIA)
-    factory = models.RoboticFactory([robot])
+    stock = models.Stock([robot])
+    factory = models.RoboticFactory(stock)
 
     # When I ask her to move to foo mine and I wait 5 rounds
     move_robot = commands.MoveRobot(robot_id=robot.id_, destination="Foo Mine")

@@ -48,6 +48,12 @@ def sell(command: commands.SellFoobars, on_factory: models.RoboticFactory) -> No
     on_factory.sell(robot_id=command.robot_id)
 
 
+@_handler.register
+def buy(command: commands.BuyRobot, on_factory: models.RoboticFactory) -> None:
+    """Ask a robot to sell some foobars"""
+    on_factory.buy_robot(robot_id=command.robot_id)
+
+
 def ignore_domain_errors(function: Handler):
     """Log domain errors but do not reraise them"""
 
