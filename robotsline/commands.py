@@ -33,3 +33,10 @@ class Wait:
     """Wait a given number of seconds"""
 
     seconds: int
+
+
+@dataclasses.dataclass(frozen=True)
+class SellFoobars:
+    """Sell some foobars"""
+
+    robot_id: int

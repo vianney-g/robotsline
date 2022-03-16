@@ -42,8 +42,14 @@ def wait(command: commands.Wait, on_factory: models.RoboticFactory) -> None:
     on_factory.wait(seconds=command.seconds)
 
 
+@_handler.register
+def sell(command: commands.SellFoobars, on_factory: models.RoboticFactory) -> None:
+    """Ask a robot to sell some foobars"""
+    on_factory.sell(robot_id=command.robot_id)
+
+
 def ignore_domain_errors(function: Handler):
-    """Log domain errors but do not raise them"""
+    """Log domain errors but do not reraise them"""
 
     def wrapper(*args, **kwargs):
         try:

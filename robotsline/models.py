@@ -5,8 +5,9 @@ import enum
 import logging
 import random
 import uuid
+from decimal import Decimal
 from itertools import count
-from typing import Counter, Iterable, Iterator, Literal, NewType, Optional, Protocol
+from typing import Counter, Iterable, Iterator, Literal, NewType, Optional
 
 from . import exceptions
 from .settings import Settings
@@ -62,19 +63,29 @@ class Material:
         raise exceptions.UnknownMaterial(material_name)
 
 
-Foobar = uuid.UUID
+@dataclasses.dataclass(frozen=True)
+class Foobar:
+    """The final product"""
+
+    id_: uuid.UUID = dataclasses.field(default_factory=uuid.uuid4)
+    price: Decimal = Decimal("1.00")
 
 
 class Stock:
     """Material stock"""
 
     def __init__(
-        self, foos_nb=0, bars_nb=0, foobars: Optional[list[Foobar]] = None
+        self,
+        foos_nb=0,
+        bars_nb=0,
+        foobars: Optional[list[Foobar]] = None,
+        money: Decimal = Decimal("0.00"),
     ) -> None:
         self.materials = Counter(foo=foos_nb, bar=bars_nb)
         if foobars is None:
             foobars = []
         self.foobars: list[Foobar] = foobars
+        self.money = money
 
     @property
     def foos(self) -> int:
@@ -105,8 +116,7 @@ class Stock:
 
     def end_assembling_success(self):
         """A new Foobar is built 😂"""
-        foobar = uuid.uuid4()
-        self.foobars.append(foobar)
+        self.foobars.append(Foobar())
 
     def end_assembling_failure(self):
         """Oh no!! 😥"""
@@ -116,6 +126,18 @@ class Stock:
     def new_material(self, material: Material):
         """Add a new material in stock"""
         self.materials[material.name] += 1
+
+    def start_selling(self, min_nb: int, max_nb: int) -> list[Foobar]:
+        """Get foobars to sell"""
+        sell_nb = min((max_nb, len(self.foobars)))
+        if sell_nb < min_nb:
+            raise exceptions.NotEnoughMaterial("Not enough foobars")
+        to_sell, self.foobars = self.foobars[:sell_nb], self.foobars[sell_nb:]
+        return to_sell
+
+    def sold(self, foobars: list[Foobar]):
+        logger.info("%s Foobar(s) sold", len(foobars))
+        self.money += sum(foobar.price for foobar in foobars)
 
 
 class RobotState(abc.ABC):
@@ -143,6 +165,12 @@ class RobotState(abc.ABC):
 
     def assemble(self, stock: Stock, assembly_success_rate: float) -> None:
         """Try to send the robot to assembly line"""
+        raise exceptions.InvalidTransition(
+            f"Cannot send robot {self.robot} to assembly line."
+        )
+
+    def sell(self, stock: Stock, min_nb: int, max_nb: int) -> None:
+        """Try to tell the robot to sell some foobars"""
         raise exceptions.InvalidTransition(
             f"Cannot send robot {self.robot} to assembly line."
         )
@@ -228,6 +256,24 @@ class Assembling(RobotState):
         self.robot.state = Idle(self.robot, location=self.location)
 
 
+class Sell(RobotState):
+    """Robot is selling"""
+
+    LOCATION = Location.MATERIAL_STORE
+
+    def __init__(self, robot: "Robot", stock: Stock, foobars: list[Foobar]) -> None:
+        super().__init__(robot, countdown=Seconds(10), location=self.LOCATION)
+        self.stock = stock
+        self.foobars = foobars
+
+    def __str__(self) -> str:
+        return f"Selling {len(self.foobars)} foobar(s)..."
+
+    def terminate(self) -> None:
+        self.stock.sold(self.foobars)
+        self.robot.state = Idle(self.robot, location=self.location)
+
+
 class Idle(RobotState):
     """Robot is sleeping 😴"""
 
@@ -246,7 +292,7 @@ class Idle(RobotState):
 
     def assemble(self, stock: Stock, assembly_success_rate: float):
         if not self.location is Assembling.LOCATION:
-            raise exceptions.InvalidTransition(f"Move to {Assembling.location} first")
+            raise exceptions.InvalidTransition(f"Move to {Assembling.LOCATION} first")
         try:
             stock.start_assembling()
         except exceptions.NotEnoughMaterial as missing_materials:
@@ -257,6 +303,13 @@ class Idle(RobotState):
             stock=stock,
             assembly_success_rate=assembly_success_rate,
         )
+
+    def sell(self, stock: Stock, min_nb: int, max_nb: int) -> None:
+        """Try to sell between min and max foobar"""
+        if not self.location is Sell.LOCATION:
+            raise exceptions.InvalidTransition(f"Move to {Sell.LOCATION} first")
+        foobars = stock.start_selling(min_nb, max_nb)
+        self.robot.state = Sell(self.robot, stock=stock, foobars=foobars)
 
 
 RobotId = int | Literal["Ghost"]
@@ -312,11 +365,12 @@ class RoboticFactory:
         stock: Optional[Stock] = None,
         settings: Settings = Settings(),
     ) -> None:
+
         if stock is None:
             stock = Stock()
 
-        self.robots = robots
         self.stock: Stock = stock
+        self.robots = robots
         self.seconds_left = Seconds(0)
         self.settings = settings
 
@@ -346,6 +400,12 @@ class RoboticFactory:
         """Say robot to assemble foobar"""
         robot = self.get_robot(robot_id)
         robot.state.assemble(self.stock, self.settings.assembly_success_rate)
+
+    def sell(self, robot_id: int) -> None:
+        """Say robot to sell foobars"""
+        robot = self.get_robot(robot_id)
+        min_nb, max_nb = self.settings.foobars_selling_range
+        robot.state.sell(self.stock, min_nb, max_nb)
 
     def run_round(self) -> None:
         """Run a given round"""
