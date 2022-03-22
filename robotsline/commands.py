@@ -10,7 +10,7 @@ class MoveRobot:
     """Ask a robot to move"""
 
     robot_id: int
-    destination: int
+    destination: str
 
 
 @dataclasses.dataclass(frozen=True)

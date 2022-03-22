@@ -21,7 +21,7 @@ class Location(enum.Enum):
     """Where robots can go"""
 
     CAFETERIA = "cafeteria"
-    ON_MY_WAY = "on my way..."
+    ON_MY_WAY = "on my way"
     FOO_MINE = "foo mine"
     BAR_MINE = "bar mine"
     ASSEMBLY_LINE = "assembly line"
@@ -34,7 +34,9 @@ class Location(enum.Enum):
         try:
             return cls(name)
         except ValueError as bad_location:
-            raise exceptions.UnknownLocation(name) from bad_location
+            raise exceptions.UnknownLocation(
+                f"Unknown location {name} 🏝"
+            ) from bad_location
 
 
 class Material(abc.ABC):
@@ -56,7 +58,7 @@ class Material(abc.ABC):
             return Foo()
         if material_name.lower() == "bar":
             return Bar.from_randomness(*mining_bar_range_time)
-        raise exceptions.UnknownMaterial(material_name)
+        raise exceptions.UnknownMaterial(f"{material_name} is not a valid material")
 
 
 class Foo(Material):
@@ -104,10 +106,18 @@ class Robot:
     def run_round(self) -> None:
         self.state.run_round()
 
+    def __str__(self) -> str:
+        return f"🤖 {self.id_}" if self else "👻"
+
     @property
     def status(self) -> str:
         """Return robot state as string"""
         return str(self.state)
+
+    @property
+    def location(self) -> str:
+        """Return robot Location as string"""
+        return self.state.location.value
 
     @classmethod
     def from_id_generator(cls, id_generator: RobotIdGenerator) -> "Robot":
@@ -122,7 +132,7 @@ class Robot:
         return robot
 
     def __bool__(self) -> bool:
-        return self.id_ == "Ghost"
+        return self.id_ != "Ghost"
 
 
 def robots_generator() -> Iterator[Robot]:
@@ -136,16 +146,21 @@ def robots_generator() -> Iterator[Robot]:
 class Stock:
     """Material stock"""
 
-    robots: list[Robot]
+    robots: list[Robot] = dataclasses.field(default_factory=list)
     foos: list[Foo] = dataclasses.field(default_factory=list)
     bars: list[Bar] = dataclasses.field(default_factory=list)
     foobars: list[Foobar] = dataclasses.field(default_factory=list)
     money: Decimal = Decimal("0.00")
-    _robot_generator: Iterable[Robot] = dataclasses.field(default_factory=robots_generator)
+    _robot_generator: Iterable[Robot] = dataclasses.field(
+        default_factory=robots_generator
+    )
 
     def add_robot(self) -> None:
         """Add a free robot to the factory"""
         self.robots.append(next(self._robot_generator))
+
+    def idle_robots(self) -> Iterable[Robot]:
+        return (robot for robot in self.robots if robot.status == "idle")
 
     def has_enough_material(self) -> bool:
         """Check if wa have enough material to build a foobar"""
@@ -160,7 +175,7 @@ class Stock:
     def start_assembling(self) -> Foobar:
         """Begin to assemble a new foobar"""
         if not self.has_enough_material():
-            raise exceptions.NotEnoughMaterial
+            raise exceptions.NotEnoughMaterial("Not enough material!")
         foo, bar = self.foos.pop(), self.bars.pop()
         return Foobar(foo, bar)
 
@@ -314,7 +329,7 @@ class Assembling(RobotState):
     LOCATION = Location.ASSEMBLY_LINE
 
     def __init__(
-            self, robot: "Robot", foobar: Foobar, stock: Stock, assembly_success_rate: float
+        self, robot: "Robot", foobar: Foobar, stock: Stock, assembly_success_rate: float
     ) -> None:
         super().__init__(robot, countdown=Seconds(2), location=self.LOCATION)
         self.stock = stock
@@ -363,12 +378,14 @@ class Idle(RobotState):
         if self.location is material.where_to_find_it:
             self.robot.state = Mining(self.robot, material, stock)
         raise exceptions.InvalidTransition(
-            f"Move to {material.where_to_find_it} before mining {material}"
+            f"Move to {material.where_to_find_it.value} before mining {material}"
         )
 
     def assemble(self, stock: Stock, assembly_success_rate: float):
         if not self.location is Assembling.LOCATION:
-            raise exceptions.InvalidTransition(f"Move to {Assembling.LOCATION} first")
+            raise exceptions.InvalidTransition(
+                f"Move to {Assembling.LOCATION.value} first"
+            )
         try:
             foobar = stock.start_assembling()
         except exceptions.NotEnoughMaterial as missing_materials:
@@ -384,13 +401,15 @@ class Idle(RobotState):
     def sell(self, stock: Stock, min_nb: int, max_nb: int) -> None:
         """Try to sell between min and max foobar"""
         if not self.location is Sell.LOCATION:
-            raise exceptions.InvalidTransition(f"Move to {Sell.LOCATION} first")
+            raise exceptions.InvalidTransition(f"Move to {Sell.LOCATION.value} first")
         foobars = stock.start_selling(min_nb, max_nb)
         self.robot.state = Sell(self.robot, stock=stock, foobars=foobars)
 
     def buy(self, stock: Stock, required_money: Decimal, required_foos: int) -> None:
         if not self.location is Location.ROBOTS_STORE:
-            raise exceptions.InvalidTransition(f"Move to {Location.ROBOTS_STORE} first")
+            raise exceptions.InvalidTransition(
+                f"Move to {Location.ROBOTS_STORE.value} first"
+            )
         stock.buy_robot(required_money, required_foos)
 
 
@@ -409,6 +428,14 @@ class RoboticFactory:
         self.stock: Stock = stock
         self.seconds_left = Seconds(0)
         self.settings = settings
+
+    @classmethod
+    def from_settings(cls, settings: Settings) -> "RoboticFactory":
+        """Build a factory from the settings"""
+        stock = Stock()
+        for _ in range(settings.initial_robots_nb):
+            stock.add_robot()
+        return cls(stock, settings)
 
     def move(self, robot_id: int, destination: str) -> None:
         """Say robot to move"""
