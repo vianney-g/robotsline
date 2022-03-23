@@ -33,9 +33,9 @@ install: $(VENV)/touchfile
 tests: $(VENV)/touchfile_tests
 	@$(PYTHON) -m pytest
 
-run_interactive:
+run_interactive: install
 	@$(PYTHON) cli.py -i
 
-run_ia:
+run_ia: install
 	@$(PYTHON) cli.py
 
