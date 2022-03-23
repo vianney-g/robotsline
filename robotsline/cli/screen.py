@@ -65,9 +65,7 @@ class Cli:
         return Columns(locations_views, title="[b]LOCATIONS", expand=False, equal=True)
 
     def _resources(self) -> Layout:
-        timeleft = "{:0>8}".format(
-            str(timedelta(seconds=self.game.factory.seconds_left))
-        )
+        timeleft = timedelta(seconds=self.game.factory.seconds_left)
         resources = [
             f"[b]FOOS:[/b] {len(self.stock.foos)}",
             f"[b]BARS:[/b] {len(self.stock.bars)}",
