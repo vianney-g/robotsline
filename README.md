@@ -2,6 +2,8 @@
 
 Automatic production line with robots
 
+![Running program](https://github.com/vianney-g/robotsline/raw/main/screenshot.png)
+
 ## Requirements
 
   - You **must** have python 3.10 on your system.
