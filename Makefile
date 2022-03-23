@@ -21,10 +21,9 @@ $(VENV)/touchfile:
 
 help:
 	@echo "------------------------------------------------------------------------"
-	@echo "#  virtualenv       Create virtualenv"
-	@echo "#  tests            Launch all tests"
 	@echo "#  help             Display this help message"
 	@echo "#  install          Install virtualenv"
+	@echo "#  tests            Launch all tests"
 	@echo "#  run_interactive  Run interactive game"
 	@echo "#  run_ia           Run IA game"
 	@echo "------------------------------------------------------------------------"
