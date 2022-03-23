@@ -23,6 +23,7 @@ class _InteractiveDirector:
         self.gui = gui
 
     def commands_gen(self) -> Iterable[tuple[commands.Command, str]]:
+        """Generator of command to pilot the game"""
         while True:
             cmd_id = self._ask_command_id()
             yield self._build_cmd(cmd_id)
@@ -32,7 +33,7 @@ class _InteractiveDirector:
         cmd_params = cmd_type.__annotations__
         kwargs = {}
         for arg_name, arg_type in cmd_params.items():
-            self.gui.redraw(f"Enter a valid {arg_type.__name__} for {arg_name}")
+            self.gui.refresh(f"Enter a valid {arg_type.__name__} for {arg_name}")
             kwargs[arg_name] = self._ask(arg_type)
         instance = cmd_type(**kwargs)
         return instance, ""
@@ -48,13 +49,14 @@ class _InteractiveDirector:
             self._cmd_instruction(choice, cmd)
             for choice, cmd in zip(choices, self.interactive_commands)
         )
-        self.gui.redraw(instructions)
+        self.gui.refresh(instructions)
         choice = IntPrompt.ask(
             "", choices=[str(c) for c in choices], console=self.gui.console
         )
         return choice - 1
 
-    def _cmd_instruction(self, entry: int, cmd: Type[commands.Command]) -> str:
+    @staticmethod
+    def _cmd_instruction(entry: int, cmd: Type[commands.Command]) -> str:
         return f"[b]{entry}:[/b] {cmd.__doc__}"
 
 

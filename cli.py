@@ -1,24 +1,11 @@
 """Cli interface"""
 import logging
+import sys
 from io import StringIO
-from typing import Iterable
 
-from robotsline import bootstrap, commands
-from robotsline.cli.interactive_adapter import get_director
+from robotsline import bootstrap
+from robotsline.cli import ia_adapter, interactive_adapter
 from robotsline.cli.screen import Cli
-
-GameDirector = Iterable[tuple[commands.Command, str]]
-
-
-_locations = [
-    "cafeteria",
-    "foo mine",
-    "bar mine",
-    "assembly line",
-    "material store",
-    "robots store",
-    "on my way",
-]
 
 _logs = StringIO()
 logging.basicConfig(
@@ -27,10 +14,24 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(_logs)],
 )
 
-_game = bootstrap.Game()
-_gui = Cli(_game.factory.stock, _locations, _logs)
 
-director: GameDirector = get_director(_game, _gui)
-for cmd, instructions in director:
-    _game.execute(cmd)
-    _gui.redraw(instructions)
+def main(interactive: bool):
+    game = bootstrap.Game()
+    cli = Cli(game, _logs)
+
+    if interactive:
+        director = interactive_adapter.get_director(game, cli)
+        cli.interactive_run(director)
+    else:
+        director = ia_adapter.get_director(game)
+        cli.live_run(director)
+
+
+if __name__ == "__main__":
+    INTERACTIVE = False
+    try:
+        if sys.argv[1] == "-i":
+            INTERACTIVE = True
+    except IndexError:
+        pass
+    main(INTERACTIVE)

@@ -20,6 +20,16 @@ class Mine:
     robot_id: int
     material: str
 
+    @classmethod
+    def Foo(cls, robot_id: int) -> "Mine":
+        """Binded factory to mine foo"""
+        return cls(robot_id=robot_id, material="foo")
+
+    @classmethod
+    def Bar(cls, robot_id: int) -> "Mine":
+        """Binded factory to mine bar"""
+        return cls(robot_id=robot_id, material="bar")
+
 
 @dataclasses.dataclass(frozen=True)
 class Assemble:

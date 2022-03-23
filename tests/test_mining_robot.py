@@ -21,7 +21,7 @@ def test_asking_a_robot_to_mine_something(material: str, at_mine: models.Locatio
     handlers.execute(mine, on_factory=factory)
 
     # the robot is now mining the requested material
-    assert robot.status == f"Mining {material} at {at_mine.value.title()}"
+    assert robot.status == f"Mining {material}"
 
 
 def test_asking_a_robot_to_mine_a_bad_material():
@@ -112,7 +112,7 @@ def test_mining_bar_waiting_longer():
     handlers.execute(commands.Wait(seconds=1), on_factory=factory)
 
     # The robot is still mining bar
-    assert robot.status == "Mining bar at Bar Mine"
+    assert robot.status == "Mining bar"
     # And I need 9 seconds more to mine bar
     handlers.execute(commands.Wait(seconds=9), on_factory=factory)
     assert robot.status == "Idle"

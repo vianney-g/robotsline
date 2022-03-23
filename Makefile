@@ -35,5 +35,8 @@ tests: $(VENV)/touchfile_tests
 	@$(PYTHON) -m pytest
 
 run_interactive:
+	@$(PYTHON) cli.py -i
+
+run_ia:
 	@$(PYTHON) cli.py
 

@@ -165,7 +165,7 @@ class Stock:
     def has_enough_material(self) -> bool:
         """Check if wa have enough material to build a foobar"""
         if len(self.foos) < 1:
-            logger.error("Not enough foos in stock!")
+            logger.info("Not enough foos in stock!")
             return False
         if len(self.bars) < 1:
             logger.error("Not enough bars in stock!")
@@ -208,11 +208,14 @@ class Stock:
         logger.info("%s Foobar(s) sold", len(foobars))
         self.money += sum(foobar.price for foobar in foobars)
 
+    def can_buy_robot(self, required_money: Decimal | int, required_foos: int) -> bool:
+        return required_money <= self.money and required_foos <= len(self.foos)
+
     def buy_robot(self, required_money: Decimal, required_foos: int):
-        if required_money > self.money:
-            raise exceptions.NotEnoughMaterial("Not enough money")
-        if required_foos > len(self.foos):
-            raise exceptions.NotEnoughMaterial("Not enough foos")
+        """Buy a robot"""
+        if not self.can_buy_robot(required_money, required_foos):
+            raise exceptions.NotEnoughMaterial("Not enough money or foos")
+
         self.money -= required_money
         for _ in range(required_foos):
             self.foos.pop()
@@ -316,7 +319,7 @@ class Mining(RobotState):
         self.stock = stock
 
     def __str__(self) -> str:
-        return f"Mining {self.material.name} at {self.location.value.title()}"
+        return f"Mining {self.material.name}"
 
     def terminate(self) -> None:
         self.stock.new_material(self.material)
@@ -378,7 +381,7 @@ class Idle(RobotState):
         if self.location is material.where_to_find_it:
             self.robot.state = Mining(self.robot, material, stock)
         raise exceptions.InvalidTransition(
-            f"Move to {material.where_to_find_it.value} before mining {material}"
+            f"Move to {material.where_to_find_it.value} before mining {material.name}"
         )
 
     def assemble(self, stock: Stock, assembly_success_rate: float):
@@ -474,7 +477,7 @@ class RoboticFactory:
             raise exceptions.GameOver
         for robot in self.stock.robots:
             robot.run_round()
-        self.seconds_left += 1
+        self.seconds_left += Seconds(1)
 
     def wait(self, seconds: int) -> None:
         """Simulate some seconds in the factory"""
