@@ -1,6 +1,6 @@
 # robotsline
 
-Automatic production line with robots
+Automatic production line with robots. This is just a simulation for a job interview.
 
 ![Running program](https://github.com/vianney-g/robotsline/raw/main/screenshot.png)
 
